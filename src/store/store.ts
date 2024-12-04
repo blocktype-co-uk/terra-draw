@@ -78,6 +78,10 @@ export class GeoJSONStore<Id extends FeatureId = FeatureId> {
 		return this.idStrategy.getId();
 	}
 
+	getFeature(id: FeatureId): GeoJSONStoreFeatures | undefined {
+		return this.store[id];
+	}
+
 	has(id: FeatureId): boolean {
 		return Boolean(this.store[id]);
 	}

@@ -13,7 +13,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.TERRA_DRAW_PAT }}
 
       - uses: actions/setup-node@v4
         with:
@@ -37,8 +36,8 @@ jobs:
 
       - name: Set git credentials
         run: |
-          git config --global user.email "terradraw@githubactions.com"
-          git config --global user.name "James Milner"
+          git config --global user.email "adam@blocktype.co.uk"
+          git config --global user.name "Adam Rae"
 
       - name: Release
         run: npm run release:beta:increment
@@ -54,4 +53,4 @@ jobs:
 
       - run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

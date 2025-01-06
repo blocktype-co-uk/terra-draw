@@ -37,7 +37,7 @@ jobs:
       - name: Set git credentials
         run: |
           git config --global user.email "adam@blocktype.co.uk"
-          git config --global user.name "Adam Rae"
+          git config --global user.name "@raemond"
 
       - name: Release
         run: npm run release:beta:increment

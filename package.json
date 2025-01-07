@@ -1,6 +1,6 @@
 {
 	"name": "@blocktype-co-uk/terra-draw",
-	"version": "1.0.0-beta.11",
+	"version": "1.0.0-beta.12",
 	"description": "Frictionless map drawing across mapping provider",
 	"scripts": {
 		"docs": "typedoc",
@@ -38,7 +38,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "@blocktype-co-uk/terra-draw"
+		"url": "git+https://github.com/blocktype-co-uk/terra-draw.git"
 	},
 	"keywords": [
 		"map",

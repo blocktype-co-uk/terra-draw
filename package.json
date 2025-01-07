@@ -51,9 +51,6 @@
 		"openlayers",
 		"maplibre"
 	],
-	"publishConfig": {
-		"@blocktype-co-uk:registry": "https://npm.pkg.github.com"
-	},
 	"devDependencies": {
 		"@arcgis/core": "4.27.6",
 		"@commitlint/cli": "17.1.2",

@@ -27,6 +27,8 @@ export interface TerraDrawAdapterStyling {
 	lineStringWidth: number;
 	lineStringColor: HexColor;
 	zIndex: number;
+	beforeId?: string;
+	sortKey: number;
 }
 
 export type CartesianPoint = { x: number; y: number };

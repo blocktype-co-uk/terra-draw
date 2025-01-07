@@ -27,7 +27,12 @@ export class FeatureAtPointerEventBehavior extends TerraDrawModeBehavior {
 		let clickedPolygon: GeoJSONStoreFeatures | undefined = undefined;
 
 		const bbox = this.createClickBoundingBox.create(event);
-		const features = this.store.search(bbox as BBoxPolygon);
+		const features = this.store.search(bbox as BBoxPolygon).sort((a, b) => {
+			const sortKeyA = Number(a.properties.sortKey ?? 0);
+			const sortKeyB = Number(b.properties.sortKey ?? 0);
+
+			return sortKeyA - sortKeyB;
+		});
 
 		for (let i = 0; i < features.length; i++) {
 			const feature = features[i];

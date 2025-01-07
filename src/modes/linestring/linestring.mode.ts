@@ -44,6 +44,7 @@ type LineStringStyling = {
 	closingPointWidth: NumericStyling;
 	closingPointOutlineColor: HexColorStyling;
 	closingPointOutlineWidth: NumericStyling;
+	beforeId: string;
 	snappingPointColor: HexColorStyling;
 	snappingPointWidth: NumericStyling;
 	snappingPointOutlineColor: HexColorStyling;
@@ -593,6 +594,7 @@ export class TerraDrawLineStringMode extends TerraDrawBaseDrawMode<LineStringSty
 				feature,
 			);
 
+			styles.beforeId = this.styles.beforeId;
 			styles.zIndex = 10;
 
 			return styles;

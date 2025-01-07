@@ -44,6 +44,8 @@ type PolygonStyling = {
 	closingPointColor: HexColorStyling;
 	closingPointOutlineWidth: NumericStyling;
 	closingPointOutlineColor: HexColorStyling;
+	beforeId: string;
+	sortKey: NumericStyling;
 	snappingPointWidth: NumericStyling;
 	snappingPointColor: HexColorStyling;
 	snappingPointOutlineWidth: NumericStyling;
@@ -410,11 +412,27 @@ export class TerraDrawPolygonMode extends TerraDrawBaseDrawMode<PolygonStyling> 
 							],
 						],
 					},
-					properties: { mode: this.mode },
+					properties: { mode: this.mode, sortKey: 0 },
 				},
 			]);
 			this.currentId = newId;
 			this.currentCoordinate++;
+
+			// set sort key property if given. This is used to sort the polygons when chosing
+			// which one to select on click
+			if (this.styles.sortKey) {
+				const feature = this.store.getFeature(newId);
+				if (feature) {
+					const value = this.getNumericStylingValue(
+						this.styles.sortKey,
+						0,
+						feature,
+					);
+					this.store.updateProperty([
+						{ id: newId, property: "sortKey", value },
+					]);
+				}
+			}
 
 			// Ensure the state is updated to reflect drawing has started
 			this.setDrawing();
@@ -635,7 +653,14 @@ export class TerraDrawPolygonMode extends TerraDrawBaseDrawMode<PolygonStyling> 
 					feature,
 				);
 
+				styles.sortKey = this.getNumericStylingValue(
+					this.styles.sortKey,
+					styles.sortKey,
+					feature,
+				);
+
 				styles.zIndex = 10;
+				styles.beforeId = this.styles.beforeId;
 				return styles;
 			} else if (feature.geometry.type === "Point") {
 				const closingPoint =

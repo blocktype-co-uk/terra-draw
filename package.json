@@ -1,5 +1,5 @@
 {
-	"name": "terra-draw",
+	"name": "@blocktype-co-uk/terra-draw",
 	"version": "1.0.0-beta.11",
 	"description": "Frictionless map drawing across mapping provider",
 	"scripts": {
@@ -36,7 +36,10 @@
 	"unpkg": "./dist/terra-draw.umd.js",
 	"author": "James Milner",
 	"license": "MIT",
-	"repository": "JamesLMilner/terra-draw",
+	"repository": {
+		"type": "git",
+		"url": "@blocktype-co-uk/terra-draw"
+	},
 	"keywords": [
 		"map",
 		"drawing",

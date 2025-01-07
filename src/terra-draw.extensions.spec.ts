@@ -202,6 +202,7 @@ class TerraDrawTestMode extends TerraDrawBaseDrawMode<TestModeStyling> {
 			pointWidth: 5,
 			lineStringColor: "#B90E0A",
 			lineStringWidth: 4,
+			sortKey: 0,
 			zIndex: 0,
 		};
 	}

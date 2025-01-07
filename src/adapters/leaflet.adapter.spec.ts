@@ -344,6 +344,7 @@ describe("TerraDrawLeafletAdapter", () => {
 				polygonOutlineWidth: 1,
 				lineStringWidth: 1,
 				lineStringColor: "#ffffff",
+				sortKey: 0,
 				zIndex: 1,
 			} as TerraDrawAdapterStyling;
 
@@ -407,6 +408,7 @@ describe("TerraDrawLeafletAdapter", () => {
 				polygonOutlineWidth: 1,
 				lineStringWidth: 1,
 				lineStringColor: "#ffffff",
+				sortKey: 0,
 				zIndex: 1,
 			} as TerraDrawAdapterStyling;
 
@@ -468,6 +470,7 @@ describe("TerraDrawLeafletAdapter", () => {
 				polygonOutlineWidth: 1,
 				lineStringWidth: 1,
 				lineStringColor: "#ffffff",
+				sortKey: 0,
 				zIndex: 1,
 			} as TerraDrawAdapterStyling;
 
@@ -555,6 +558,7 @@ describe("TerraDrawLeafletAdapter", () => {
 				polygonOutlineWidth: 1,
 				lineStringWidth: 1,
 				lineStringColor: "#ffffff",
+				sortKey: 0,
 				zIndex: 1,
 			} as TerraDrawAdapterStyling;
 
@@ -642,6 +646,7 @@ describe("TerraDrawLeafletAdapter", () => {
 				polygonOutlineWidth: 1,
 				lineStringWidth: 1,
 				lineStringColor: "#ffffff",
+				sortKey: 0,
 				zIndex: 1,
 			} as TerraDrawAdapterStyling;
 
@@ -708,6 +713,7 @@ describe("TerraDrawLeafletAdapter", () => {
 				polygonOutlineWidth: 1,
 				lineStringWidth: 1,
 				lineStringColor: "#ffffff",
+				sortKey: 0,
 				zIndex: 1,
 			} as TerraDrawAdapterStyling;
 

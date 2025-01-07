@@ -145,6 +145,7 @@ export class TerraDrawRenderMode extends TerraDrawBaseDrawMode<RenderModeStyling
 				defaultStyles.lineStringColor,
 				feature,
 			),
+			sortKey: 0,
 			zIndex: this.getNumericStylingValue(
 				this.styles.zIndex,
 				defaultStyles.zIndex,

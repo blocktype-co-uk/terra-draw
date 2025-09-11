@@ -1,5 +1,5 @@
 {
-	"name": "@blocktype-co-uk/terra-draw",
+	"name": "@blocktype-co-uk/terra-draw-monorepo",
 	"version": "1.0.0",
 	"description": "The monorepo for all core Terra Draw packages",
 	"private": true,

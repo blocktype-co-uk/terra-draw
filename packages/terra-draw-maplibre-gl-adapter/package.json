@@ -1,9 +1,9 @@
 {
-	"name": "terra-draw-maplibre-gl-adapter",
+	"name": "@blocktype-co-uk/terra-draw-maplibre-gl-adapter",
 	"version": "1.1.2",
 	"description": "Terra Draw Adapter for Maplibre GL JS",
 	"peerDependencies": {
-		"terra-draw": "^1.0.0",
+		"@blocktype-co-uk/terra-draw": "^1.0.0",
 		"maplibre-gl": ">=4"
 	},
 	"scripts": {
@@ -36,7 +36,10 @@
 	"unpkg": "./dist/terra-draw-maplibre-gl-adapter.umd.js",
 	"author": "James Milner",
 	"license": "MIT",
-	"repository": "JamesLMilner/terra-draw",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/blocktype-co-uk/terra-draw.git"
+	},
 	"keywords": [
 		"map",
 		"drawing",

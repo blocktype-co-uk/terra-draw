@@ -641,6 +641,19 @@ export class TerraDrawPolygonMode extends TerraDrawBaseDrawMode<PolygonStyling> 
 			this.currentId = newId;
 			this.currentCoordinate++;
 
+			// set zIndex property if given. This is used to sort the polygons when choosing which one to select on click
+			if (this.styles.zIndex) {
+				const feature = this.store.copy(newId);
+				if (feature) {
+					const value = this.getNumericStylingValue(
+						this.styles.zIndex,
+						0,
+						feature,
+					);
+					this.store.updateProperty([{ id: newId, property: "zIndex", value }]);
+				}
+			}
+
 			if (this.showCoordinatePoints) {
 				this.coordinatePoints.createOrUpdate(newId);
 			}

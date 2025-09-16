@@ -7,7 +7,7 @@ import {
 	TerraDrawStylingFunction,
 	TerraDrawExtend,
 	GeoJSONStoreGeometries,
-} from "terra-draw";
+} from "@blocktype-co-uk/terra-draw";
 import {
 	CircleLayerSpecification,
 	FillLayerSpecification,

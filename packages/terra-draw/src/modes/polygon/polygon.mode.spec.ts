@@ -864,7 +864,10 @@ describe("TerraDrawPolygonMode", () => {
 		};
 
 		beforeEach(() => {
-			polygonMode = new TerraDrawPolygonMode({ editable: true });
+			polygonMode = new TerraDrawPolygonMode({
+				editable: true,
+				styles: { zIndex: 42 },
+			});
 			const mockConfig = MockModeConfig(polygonMode.mode);
 
 			onFinish = mockConfig.onFinish;
@@ -943,6 +946,24 @@ describe("TerraDrawPolygonMode", () => {
 
 			features = store.copyAll();
 			expect(features.length).toBe(2);
+		});
+
+		it("can create a polygon and the default zIndex is applied", () => {
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 2 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 2 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 3, lat: 3 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 3, lat: 3 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 3, lat: 3 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+			const features = store.copyAll();
+			expect(features.length).toEqual(2);
+			const polygon = features.at(1)!;
+			expect(polygon.properties).toMatchObject({ zIndex: 42 });
 		});
 
 		it("can create a polygon with toCustom snapping enabled", () => {

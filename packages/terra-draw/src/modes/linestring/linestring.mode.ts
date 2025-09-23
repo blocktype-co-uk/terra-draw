@@ -45,6 +45,7 @@ const defaultKeyEvents = { cancel: "Escape", finish: "Enter" } as const;
 type LineStringStyling = {
 	lineStringWidth: NumericStyling;
 	lineStringColor: HexColorStyling;
+	lineStringDash: NumericStyling;
 	closingPointColor: HexColorStyling;
 	closingPointWidth: NumericStyling;
 	closingPointOutlineColor: HexColorStyling;
@@ -940,6 +941,12 @@ export class TerraDrawLineStringMode extends TerraDrawBaseDrawMode<LineStringSty
 			styles.lineStringWidth = this.getNumericStylingValue(
 				this.styles.lineStringWidth,
 				styles.lineStringWidth,
+				feature,
+			);
+
+			styles.lineStringDash = this.getNumericStylingValue(
+				this.styles.lineStringDash,
+				styles.lineStringDash,
 				feature,
 			);
 

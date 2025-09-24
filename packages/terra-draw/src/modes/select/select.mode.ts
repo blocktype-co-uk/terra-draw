@@ -108,6 +108,7 @@ type SelectionStyling = {
 };
 
 interface Cursors {
+	pointerOverSelectionPoint?: Cursor;
 	pointerOver?: Cursor;
 	dragStart?: Cursor;
 	dragEnd?: Cursor;
@@ -115,6 +116,7 @@ interface Cursors {
 }
 
 const defaultCursors = {
+	pointerOverSelectionPoint: "move",
 	pointerOver: "move",
 	dragStart: "move",
 	dragEnd: "move",
@@ -955,6 +957,14 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		// If we have a feature under the pointer then show the pointer over cursor
 		const { clickedFeature: featureUnderPointer } =
 			this.featuresAtMouseEvent.find(event, true);
+
+		if (
+			featureUnderPointer?.geometry.type !== "Point" &&
+			nearbySelectionPoint
+		) {
+			this.setCursor(this.cursors.pointerOverSelectionPoint);
+			return;
+		}
 
 		if (
 			this.selected.length > 0 &&

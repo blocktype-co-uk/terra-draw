@@ -329,7 +329,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			const distance = this.pixelDistance.measure(event, geometry.coordinates);
 
 			if (
-				distance < this.pointerDistance &&
+				distance < this.pointerDistance / 2 &&
 				distance < clickedFeatureDistance
 			) {
 				clickedFeatureDistance = distance;
@@ -930,7 +930,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			const geometry = this.store.getGeometryCopy<Point>(id);
 			const distance = this.pixelDistance.measure(event, geometry.coordinates);
 
-			if (distance < this.pointerDistance) {
+			if (distance < this.pointerDistance / 2) {
 				nearbyMidPoint = true;
 			}
 		});
@@ -941,7 +941,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		this.selectionPoints.ids.forEach((id: FeatureId) => {
 			const geometry = this.store.getGeometryCopy<Point>(id);
 			const distance = this.pixelDistance.measure(event, geometry.coordinates);
-			if (distance < this.pointerDistance) {
+			if (distance < this.pointerDistance / 2) {
 				nearbyMidPoint = false;
 				nearbySelectionPoint = true;
 			}

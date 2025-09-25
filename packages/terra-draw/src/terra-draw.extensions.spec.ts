@@ -132,6 +132,7 @@ export class TerraDrawTestAdapter extends TerraDrawBaseAdapter {
 		_:
 			| "move"
 			| "unset"
+			| "default"
 			| "grab"
 			| "grabbing"
 			| "crosshair"

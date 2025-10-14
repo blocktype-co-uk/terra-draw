@@ -131,76 +131,99 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 	});
 
 	describe("setDraggability", () => {
-		it("setDraggability enables and disables map dragging", () => {
-			const map = createMapLibreGLMap();
+		describe("when disabling first", () => {
+			it("setDraggability disables and re-enables map dragging", () => {
+				// drag pan and rotate are enabled by default
+				const map = createMapLibreGLMap();
 
-			const adapter = new TerraDrawMapLibreGLAdapter({
-				map: map as maplibregl.Map,
+				const adapter = new TerraDrawMapLibreGLAdapter({
+					map: map as maplibregl.Map,
+				});
+
+				// Test disabling dragging
+				adapter.setDraggability(false);
+				expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+				expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
+				expect(map.dragRotate?.disable).toHaveBeenCalledTimes(1);
+
+				// Test enabling dragging
+				adapter.setDraggability(true);
+				expect(map.dragPan?.enable).toHaveBeenCalledTimes(1);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1); // from setDraggability(false)
+				expect(map.dragRotate?.enable).toHaveBeenCalledTimes(1);
+				expect(map.dragRotate?.disable).toHaveBeenCalledTimes(1); // from setDraggability(false)
 			});
 
-			// Test enabling dragging
-			adapter.setDraggability(true);
-			expect(map.dragPan?.enable).toHaveBeenCalledTimes(1);
-			expect(map.dragPan?.disable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.enable).toHaveBeenCalledTimes(1);
-			expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
+			it("respects mixed pan/rotate settings when calling setDraggability", () => {
+				const map = createMapLibreGLMap();
 
-			// Test disabling dragging
-			adapter.setDraggability(false);
-			expect(map.dragPan?.enable).toHaveBeenCalledTimes(1);
-			expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
-			expect(map.dragRotate?.enable).toHaveBeenCalledTimes(1);
-			expect(map.dragRotate?.disable).toHaveBeenCalledTimes(1);
+				// we expect it to disable both, but only re-enable drag pan
+				map.dragPan!.isEnabled = jest.fn(() => true);
+				map.dragRotate!.isEnabled = jest.fn(() => false);
+
+				const adapter = new TerraDrawMapLibreGLAdapter({
+					map: map as maplibregl.Map,
+				});
+
+				// Test disabling dragging
+				adapter.setDraggability(false);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+				expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
+				expect(map.dragRotate?.disable).toHaveBeenCalledTimes(1);
+				expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
+
+				// Test enabling dragging
+				adapter.setDraggability(true);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+				expect(map.dragPan?.enable).toHaveBeenCalledTimes(1);
+				expect(map.dragRotate?.disable).toHaveBeenCalledTimes(1);
+				expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
+			});
+
+			describe("and the map was previously not dragable", () => {
+				it("it does not re-enable pan/rotate settings", () => {
+					const map = createMapLibreGLMap();
+					map.dragPan!.isEnabled = jest.fn(() => false);
+					map.dragRotate!.isEnabled = jest.fn(() => false);
+
+					const adapter = new TerraDrawMapLibreGLAdapter({
+						map: map as maplibregl.Map,
+					});
+
+					// Test enabling dragging
+					adapter.setDraggability(false);
+					expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
+					expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+					expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
+					expect(map.dragRotate?.disable).toHaveBeenCalledTimes(1);
+
+					// Test re-enabling dragging
+					adapter.setDraggability(true);
+					expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
+					expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+					expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
+					expect(map.dragRotate?.disable).toHaveBeenCalledTimes(1);
+				});
+			});
 		});
 
-		it("respects original pan/rotate settings when calling setDraggability", () => {
-			const map = createMapLibreGLMap();
+		describe("when enabling first", () => {
+			it("it does nothing", () => {
+				const map = createMapLibreGLMap();
+				map.dragPan!.isEnabled = jest.fn(() => false);
+				map.dragRotate!.isEnabled = jest.fn(() => false);
 
-			map.dragPan!.isEnabled = jest.fn(() => false);
-			map.dragRotate!.isEnabled = jest.fn(() => false);
+				const adapter = new TerraDrawMapLibreGLAdapter({
+					map: map as maplibregl.Map,
+				});
 
-			const adapter = new TerraDrawMapLibreGLAdapter({
-				map: map as maplibregl.Map,
+				adapter.setDraggability(true);
+				expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(0);
+				expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
+				expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
 			});
-
-			// Test enabling dragging
-			adapter.setDraggability(true);
-			expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
-			expect(map.dragPan?.disable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
-
-			// Test disabling dragging
-			adapter.setDraggability(false);
-			expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
-			expect(map.dragPan?.disable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
-		});
-
-		it("respects mixed pan/rotate settings when calling setDraggability", () => {
-			const map = createMapLibreGLMap();
-
-			map.dragPan!.isEnabled = jest.fn(() => true);
-			map.dragRotate!.isEnabled = jest.fn(() => false);
-
-			const adapter = new TerraDrawMapLibreGLAdapter({
-				map: map as maplibregl.Map,
-			});
-
-			// Test enabling dragging
-			adapter.setDraggability(true);
-			expect(map.dragPan?.enable).toHaveBeenCalledTimes(1);
-			expect(map.dragPan?.disable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
-
-			// Test disabling dragging
-			adapter.setDraggability(false);
-			expect(map.dragPan?.enable).toHaveBeenCalledTimes(1);
-			expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
-			expect(map.dragRotate?.enable).toHaveBeenCalledTimes(0);
-			expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
 		});
 	});
 

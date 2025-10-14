@@ -36,9 +36,6 @@ export class TerraDrawMapLibreGLAdapter<
 		this._map = config.map as Map;
 		this._container = this._map.getContainer();
 
-		// We want to respect the initial map settings
-		this._initialDragRotate = this._map.dragRotate.isEnabled();
-		this._initialDragPan = this._map.dragPan.isEnabled();
 		this._renderLinesBeforeLayerId =
 			config.renderLinesBelowLayerId ?? config.renderBelowLayerId;
 		this._renderPointsBeforeLayerId =
@@ -53,8 +50,9 @@ export class TerraDrawMapLibreGLAdapter<
 	private _renderPointsBeforeLayerId: string | undefined;
 	private _renderLinesBeforeLayerId: string | undefined;
 	private _prefixId: string;
-	private _initialDragPan: boolean;
-	private _initialDragRotate: boolean;
+	private _initialDragPan: boolean | undefined;
+	private _initialDragRotate: boolean | undefined;
+	private _isManagingDrag: boolean = false;
 	private _nextRender: number | undefined;
 	private _map: Map;
 	private _container: HTMLElement;
@@ -246,21 +244,33 @@ export class TerraDrawMapLibreGLAdapter<
 	 */
 	public setDraggability(enabled: boolean) {
 		if (enabled) {
-			// MapLibre GL has both drag rotation and drag panning interactions
-			// hence having to enable/disable both
-			if (this._initialDragRotate) {
-				this._map.dragRotate.enable();
+			// Only restore if we were previously managing the drag state
+			if (this._isManagingDrag) {
+				// Restore to previously stored settings
+				if (this._initialDragRotate) {
+					this._map.dragRotate.enable();
+				}
+				if (this._initialDragPan) {
+					this._map.dragPan.enable();
+				}
+
+				// Clear management state
+				this._isManagingDrag = false;
+				this._initialDragRotate = undefined;
+				this._initialDragPan = undefined;
 			}
-			if (this._initialDragPan) {
-				this._map.dragPan.enable();
-			}
+			// If we weren't managing drag, do nothing - let the map keep its current state
 		} else {
-			if (this._initialDragRotate) {
-				this._map.dragRotate.disable();
+			// Store current settings before disabling (only on first disable)
+			if (!this._isManagingDrag) {
+				this._initialDragRotate = this._map.dragRotate.isEnabled();
+				this._initialDragPan = this._map.dragPan.isEnabled();
+				this._isManagingDrag = true;
 			}
-			if (this._initialDragPan) {
-				this._map.dragPan.disable();
-			}
+
+			// Disable both interactions
+			this._map.dragRotate.disable();
+			this._map.dragPan.disable();
 		}
 	}
 

@@ -25,8 +25,10 @@ export interface TerraDrawAdapterStyling {
 	polygonFillOpacity: number;
 	polygonOutlineColor: HexColor;
 	polygonOutlineWidth: number;
+	polygonOutlineDash: number;
 	lineStringWidth: number;
 	lineStringColor: HexColor;
+	lineStringDash: number;
 	zIndex: number;
 }
 

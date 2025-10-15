@@ -280,6 +280,29 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			expect(map.getCanvas).toHaveBeenCalledTimes(2);
 			expect(container.style.cursor).toBe("pointer");
 		});
+
+		describe("when a cursor is set and then unset", () => {
+			it("restores the initial cursor", () => {
+				const map = createMapLibreGLMap();
+				const adapter = new TerraDrawMapLibreGLAdapter({
+					map: map as maplibregl.Map,
+				});
+
+				const container = {
+					offsetLeft: 0,
+					offsetTop: 0,
+					style: { removeProperty: jest.fn(), cursor: "initial" },
+				} as unknown as HTMLCanvasElement;
+
+				map.getCanvas = jest.fn(() => container);
+
+				adapter.setCursor("pointer");
+				expect(container.style.cursor).toBe("pointer");
+
+				adapter.setCursor("unset");
+				expect(container.style.cursor).toBe("initial");
+			});
+		});
 	});
 
 	describe("setDoubleClickToZoom", () => {

@@ -97,6 +97,7 @@ export class TerraDrawMapLibreGLAdapter<
 			paint: {
 				"line-width": ["get", "polygonOutlineWidth"],
 				"line-color": ["get", "polygonOutlineColor"],
+				"line-dasharray": ["get", "polygonOutlineDash"],
 			},
 		} as LineLayerSpecification);
 
@@ -115,6 +116,7 @@ export class TerraDrawMapLibreGLAdapter<
 			paint: {
 				"line-width": ["get", "lineStringWidth"],
 				"line-color": ["get", "lineStringColor"],
+				"line-dasharray": ["literal", "lineStringDash"],
 			},
 		} as LineLayerSpecification);
 
@@ -389,12 +391,21 @@ export class TerraDrawMapLibreGLAdapter<
 				} else if (feature.geometry.type === "LineString") {
 					properties.lineStringColor = styles.lineStringColor;
 					properties.lineStringWidth = styles.lineStringWidth;
+					properties.lineStringDash = [
+						styles.lineStringDash,
+						1 - styles.lineStringDash,
+					];
+					properties.lineStringDash = [5, 5];
 					linestrings.push(feature);
 				} else if (feature.geometry.type === "Polygon") {
 					properties.polygonFillColor = styles.polygonFillColor;
 					properties.polygonFillOpacity = styles.polygonFillOpacity;
 					properties.polygonOutlineColor = styles.polygonOutlineColor;
 					properties.polygonOutlineWidth = styles.polygonOutlineWidth;
+					properties.polygonOutlineDash = [
+						styles.polygonOutlineDash,
+						1 - styles.polygonOutlineDash,
+					];
 					polygons.push(feature);
 				}
 			}

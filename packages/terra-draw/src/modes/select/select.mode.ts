@@ -139,15 +139,19 @@ interface Cursors {
 }
 
 const defaultCursors = {
-	pointerOverSelectionPoint: "move",
+	// pointerOverSelectionPoint intentionally omitted from defaults:
+	// it is a fork-specific alias for pointerOverCoordinate kept for backward compatibility.
+	// It is only used when explicitly provided by the caller; otherwise the chain falls
+	// through to pointerOver.  See getPointerOverCoordinateCursor().
 	pointerOver: "move",
 	dragStart: "move",
 	dragEnd: "move",
 	insertMidpoint: "crosshair",
 } as Required<Cursors>;
 
-interface TerraDrawSelectModeOptions<T extends CustomStyling>
-	extends BaseModeOptions<T> {
+interface TerraDrawSelectModeOptions<
+	T extends CustomStyling,
+> extends BaseModeOptions<T> {
 	pointerDistance?: number;
 	flags?: { [mode: string]: ModeFlags };
 	keyEvents?: TerraDrawSelectModeKeyEvents | null;

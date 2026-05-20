@@ -9,12 +9,12 @@ import {
 	GeoJSONStoreGeometries,
 } from "@blocktype-co-uk/terra-draw";
 import {
-	CircleLayerSpecification,
-	FillLayerSpecification,
-	GeoJSONSource,
-	LineLayerSpecification,
-	Map,
-	PointLike,
+	type CircleLayerSpecification,
+	type FillLayerSpecification,
+	type GeoJSONSource,
+	type LineLayerSpecification,
+	type Map as MaplibreMap,
+	type PointLike,
 } from "maplibre-gl";
 import { Feature, LineString, Point, Polygon } from "geojson";
 
@@ -33,7 +33,7 @@ export class TerraDrawMapLibreGLAdapter<
 	) {
 		super(config);
 
-		this._map = config.map as Map;
+		this._map = config.map as MaplibreMap;
 		this._container = this._map.getContainer();
 
 		this._renderLinesBeforeLayerId =
@@ -46,17 +46,112 @@ export class TerraDrawMapLibreGLAdapter<
 		this._prefixId = config.prefixId || "td";
 	}
 
+	// Per-layer render ordering (fork extension — allows finer-grained control than
+	// upstream's single renderBelowLayerId option)
 	private _renderPolygonsBeforeLayerId: string | undefined;
 	private _renderPointsBeforeLayerId: string | undefined;
 	private _renderLinesBeforeLayerId: string | undefined;
+
+	private hashCode(str: string): number {
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			hash = (hash << 5) - hash + str.charCodeAt(i);
+			hash |= 0; // Force to 32-bit integer
+		}
+		return Math.abs(hash);
+	}
+
+	// MapLibre/Mapbox GL do not support sizing icons on both the X and Y axis independently
+	// To maintain compatibility we resize the image to the desired dimensions and then
+	// pass that to MapLibre/Mapbox GL as a base64 string
+	private resizeImage(
+		imageUrl: string,
+		width: number,
+		height: number,
+		callback: (resizedDataURL: string) => void,
+	) {
+		const img = new Image();
+		img.crossOrigin = "anonymous"; // if loading from remote source
+		img.onload = () => {
+			const canvas = document.createElement("canvas");
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext("2d");
+			if (!ctx) {
+				throw new Error("Could not get canvas context");
+			}
+			ctx.drawImage(img, 0, 0, width, height);
+			const resizedDataURL = canvas.toDataURL(); // base64 string
+			callback(resizedDataURL);
+		};
+		img.src = imageUrl;
+	}
 	private _prefixId: string;
 	private _initialDragPan: boolean | undefined;
 	private _initialDragRotate: boolean | undefined;
 	private _initialCursor: string | undefined;
 	private _isManagingDrag: boolean = false;
 	private _nextRender: number | undefined;
-	private _map: Map;
+	private _map: MaplibreMap;
 	private _container: HTMLElement;
+
+	private toGlDashArrayFromPixels(
+		dash: [number, number] | undefined,
+		lineWidth: number,
+	): [number, number] | null {
+		if (!dash) {
+			return null;
+		}
+
+		const [onPx, offPx] = dash;
+		if (
+			!Number.isFinite(onPx) ||
+			!Number.isFinite(offPx) ||
+			onPx < 0 ||
+			offPx < 0
+		) {
+			return null;
+		}
+
+		const width = Math.max(0.0001, lineWidth);
+		return [onPx / width, offPx / width];
+	}
+
+	private isMapLibreAtLeast(minVersion: string): boolean {
+		const runtimeVersion = this._map.version;
+
+		// Default to not supporting features if we can't determine the version, as we know some features we use require a minimum version.
+		if (!runtimeVersion) {
+			return false;
+		}
+
+		const parse = (v: string): [number, number, number] | null => {
+			const match = v.match(/(\d+)\.(\d+)\.(\d+)/);
+			if (!match) {
+				return null;
+			}
+
+			return [
+				parseInt(match[1], 10),
+				parseInt(match[2], 10),
+				parseInt(match[3], 10),
+			];
+		};
+
+		const actual = parse(runtimeVersion);
+		const minimum = parse(minVersion);
+
+		if (!actual || !minimum) {
+			return true;
+		}
+
+		const [a1, b1, c1] = actual;
+		const [a2, b2, c2] = minimum;
+
+		if (a1 !== a2) return a1 > a2;
+		if (b1 !== b2) return b1 > b2;
+		return c1 >= c2;
+	}
 
 	private _addGeoJSONSource(id: string, features: Feature[]) {
 		this._map.addSource(id, {
@@ -97,6 +192,7 @@ export class TerraDrawMapLibreGLAdapter<
 			paint: {
 				"line-width": ["get", "polygonOutlineWidth"],
 				"line-color": ["get", "polygonOutlineColor"],
+				"line-opacity": ["get", "polygonOutlineOpacity"],
 			},
 		} as LineLayerSpecification);
 
@@ -104,6 +200,17 @@ export class TerraDrawMapLibreGLAdapter<
 	}
 
 	private _addLineLayer(id: string) {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const paint: { "line-dasharray"?: any[] } = {};
+
+		if (this.isMapLibreAtLeast("5.8.0")) {
+			paint["line-dasharray"] = [
+				"coalesce",
+				["get", "lineStringDash"],
+				["literal", [1, 0]],
+			];
+		}
+
 		const layer = this._map.addLayer({
 			id,
 			source: id,
@@ -113,8 +220,10 @@ export class TerraDrawMapLibreGLAdapter<
 			},
 			// No need for filters as style is driven by properties
 			paint: {
+				...paint,
 				"line-width": ["get", "lineStringWidth"],
 				"line-color": ["get", "lineStringColor"],
+				"line-opacity": ["get", "lineStringOpacity"],
 			},
 		} as LineLayerSpecification);
 
@@ -133,10 +242,28 @@ export class TerraDrawMapLibreGLAdapter<
 			paint: {
 				"circle-stroke-color": ["get", "pointOutlineColor"],
 				"circle-stroke-width": ["get", "pointOutlineWidth"],
+				"circle-stroke-opacity": ["get", "pointOutlineOpacity"],
 				"circle-radius": ["get", "pointWidth"],
 				"circle-color": ["get", "pointColor"],
+				"circle-opacity": ["get", "pointOpacity"],
 			},
 		} as CircleLayerSpecification);
+
+		return layer;
+	}
+
+	private _addMarkerLayer(id: string) {
+		const layer = this._map.addLayer({
+			id: id + "-marker",
+			source: id,
+			type: "symbol",
+			filter: ["has", "markerId"],
+			layout: {
+				"icon-image": ["image", ["get", "markerId"]],
+				"icon-anchor": "bottom", // bottom center of icon will be aligned to point
+				"icon-allow-overlap": true,
+			},
+		});
 
 		return layer;
 	}
@@ -147,6 +274,7 @@ export class TerraDrawMapLibreGLAdapter<
 	) {
 		if (featureType === "Point") {
 			this._addPointLayer(id);
+			this._addMarkerLayer(id);
 		}
 		if (featureType === "LineString") {
 			this._addLineLayer(id);
@@ -384,15 +512,71 @@ export class TerraDrawMapLibreGLAdapter<
 					properties.pointColor = styles.pointColor;
 					properties.pointOutlineColor = styles.pointOutlineColor;
 					properties.pointOutlineWidth = styles.pointOutlineWidth;
+
+					// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+					const pointOutlineOpacity = (
+						styles as { pointOutlineOpacity?: number }
+					).pointOutlineOpacity;
+					properties.pointOutlineOpacity =
+						pointOutlineOpacity === undefined ? 1 : pointOutlineOpacity;
+
 					properties.pointWidth = styles.pointWidth;
+
+					// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+					const pointOpacity = (styles as { pointOpacity?: number })
+						.pointOpacity;
+					properties.pointOpacity =
+						pointOpacity === undefined ? 1 : pointOpacity;
+
+					if (styles.markerUrl && styles.markerWidth && styles.markerHeight) {
+						const id = `marker-${this.hashCode(styles.markerUrl)}`;
+
+						if (!this._map.hasImage(id)) {
+							this.resizeImage(
+								styles.markerUrl,
+								styles.markerWidth,
+								styles.markerHeight,
+								(resizedDataURL) => {
+									this._map.loadImage(resizedDataURL).then((image) => {
+										// Async so we check again if the image has been added
+										if (!this._map.hasImage(id)) {
+											this._map.addImage(id, image.data);
+										}
+									});
+								},
+							);
+						}
+
+						properties.markerId = id;
+						properties.pointWidth = 0; // Make circle invisible
+					}
+
 					points.push(feature);
 				} else if (feature.geometry.type === "LineString") {
+					properties.lineStringDash = this.toGlDashArrayFromPixels(
+						// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+						(styles as { lineStringDash?: [number, number] }).lineStringDash,
+						styles.lineStringWidth,
+					);
+
 					properties.lineStringColor = styles.lineStringColor;
 					properties.lineStringWidth = styles.lineStringWidth;
+
+					// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+					const lineStringOpacity = (styles as { lineStringOpacity?: number })
+						.lineStringOpacity;
+					properties.lineStringOpacity =
+						lineStringOpacity === undefined ? 1 : lineStringOpacity;
 					linestrings.push(feature);
 				} else if (feature.geometry.type === "Polygon") {
+					const polygonOutlineOpacity = (
+						styles as { polygonOutlineOpacity?: number }
+					).polygonOutlineOpacity;
+
 					properties.polygonFillColor = styles.polygonFillColor;
 					properties.polygonFillOpacity = styles.polygonFillOpacity;
+					properties.polygonOutlineOpacity =
+						polygonOutlineOpacity === undefined ? 1 : polygonOutlineOpacity;
 					properties.polygonOutlineColor = styles.polygonOutlineColor;
 					properties.polygonOutlineWidth = styles.polygonOutlineWidth;
 					polygons.push(feature);
@@ -481,6 +665,7 @@ export class TerraDrawMapLibreGLAdapter<
 		};
 
 		this._map.removeLayer(`${this._prefixId}-point`);
+		this._map.removeLayer(`${this._prefixId}-point-marker`);
 		this._map.removeSource(`${this._prefixId}-point`);
 		this._map.removeLayer(`${this._prefixId}-linestring`);
 		this._map.removeSource(`${this._prefixId}-linestring`);
@@ -520,8 +705,9 @@ export class TerraDrawMapLibreGLAdapter<
 			this._map.moveLayer(polygonStringId, this._renderPolygonsBeforeLayerId);
 		}
 
+		// console.log('image added', image.data)
 		if (this._currentModeCallbacks?.onReady) {
-			this._currentModeCallbacks.onReady();
+			this._currentModeCallbacks?.onReady();
 		}
 	}
 }

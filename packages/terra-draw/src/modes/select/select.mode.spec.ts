@@ -1,9 +1,14 @@
-import { Position } from "geojson";
+import { Polygon, Position } from "geojson";
 import { MockModeConfig } from "../../test/mock-mode-config";
 import { TerraDrawSelectMode } from "./select.mode";
 import { MockCursorEvent } from "../../test/mock-cursor-event";
 import { MockKeyboardEvent } from "../../test/mock-keyboard-event";
-import { TerraDrawGeoJSONStore, TerraDrawMouseEvent } from "../../common";
+import {
+	COMMON_PROPERTIES,
+	SELECT_PROPERTIES,
+	TerraDrawGeoJSONStore,
+	TerraDrawMouseEvent,
+} from "../../common";
 import { DefaultPointerEvents } from "../base.mode";
 
 describe("TerraDrawSelectMode", () => {
@@ -34,7 +39,7 @@ describe("TerraDrawSelectMode", () => {
 	};
 
 	const addPolygonToStore = (coords: Position[]) => {
-		store.create([
+		return store.create([
 			{
 				geometry: {
 					type: "Polygon",
@@ -44,7 +49,7 @@ describe("TerraDrawSelectMode", () => {
 					mode: "polygon",
 				},
 			},
-		]);
+		])[0];
 	};
 
 	const addLineStringToStore = (coords: Position[]) => {
@@ -125,6 +130,11 @@ describe("TerraDrawSelectMode", () => {
 				},
 			});
 		});
+
+		it("constructs with custom mode name", () => {
+			const selectMode = new TerraDrawSelectMode({ modeName: "custom" });
+			expect(selectMode.mode).toBe("custom");
+		});
 	});
 
 	describe("lifecycle", () => {
@@ -193,6 +203,51 @@ describe("TerraDrawSelectMode", () => {
 			selectMode.stop();
 
 			expect(selectMode.state).toBe("stopped");
+		});
+	});
+
+	describe("programmatic selection", () => {
+		it("does not deselect when deselectFeature is called with a different id", () => {
+			setSelectMode({
+				flags: {
+					polygon: {
+						feature: {},
+					},
+				},
+			});
+
+			selectMode.start();
+
+			const selectedFeatureId = addPolygonToStore([
+				[0, 0],
+				[0, 1],
+				[1, 1],
+				[1, 0],
+				[0, 0],
+			]);
+
+			const otherFeatureId = addPolygonToStore([
+				[2, 2],
+				[2, 3],
+				[3, 3],
+				[3, 2],
+				[2, 2],
+			]);
+
+			expect(selectedFeatureId).not.toBe(otherFeatureId);
+
+			selectMode.selectFeature(selectedFeatureId);
+
+			onChange.mockClear();
+			onDeselect.mockClear();
+
+			selectMode.deselectFeature(otherFeatureId);
+
+			expect(onDeselect).not.toHaveBeenCalled();
+			expect(
+				store.getPropertiesCopy(selectedFeatureId)[SELECT_PROPERTIES.SELECTED],
+			).toBe(true);
+			expect(onChange).not.toHaveBeenCalled();
 		});
 	});
 
@@ -355,6 +410,85 @@ describe("TerraDrawSelectMode", () => {
 					expect(onDeselect).toHaveBeenCalledTimes(0);
 				});
 
+				it("does not select if feature is clicked but allowManualSelection is false", () => {
+					setSelectMode({
+						allowManualSelection: false,
+						flags: {
+							polygon: { feature: {} },
+						},
+					});
+
+					// Square Polygon
+					addPolygonToStore([
+						[0, 0],
+						[0, 1],
+						[1, 1],
+						[1, 0],
+						[0, 0],
+					]);
+
+					selectMode.onClick(MockCursorEvent({ lng: 0.5, lat: 0.5 }));
+
+					expect(onSelect).toHaveBeenCalledTimes(0);
+				});
+
+				it("does select via selectFeature API even when allowManualSelection is false", () => {
+					setSelectMode({
+						allowManualSelection: false,
+						flags: {
+							polygon: { feature: {} },
+						},
+					});
+
+					const id = addPolygonToStore([
+						[0, 0],
+						[0, 1],
+						[1, 1],
+						[1, 0],
+						[0, 0],
+					]);
+
+					selectMode.selectFeature(id);
+
+					expect(onSelect).toHaveBeenCalledTimes(1);
+					expect(onSelect).toHaveBeenCalledWith(id);
+				});
+
+				it("does not switch selection to another feature on click when allowManualSelection is false", () => {
+					setSelectMode({
+						allowManualSelection: false,
+						flags: {
+							polygon: { feature: {} },
+						},
+					});
+
+					const id = addPolygonToStore([
+						[0, 0],
+						[0, 1],
+						[1, 1],
+						[1, 0],
+						[0, 0],
+					]);
+
+					addPolygonToStore([
+						[2, 2],
+						[2, 3],
+						[3, 3],
+						[3, 2],
+						[2, 2],
+					]);
+
+					// Select first polygon via API
+					selectMode.selectFeature(id);
+					expect(onSelect).toHaveBeenCalledTimes(1);
+
+					// Click second polygon - should not change selection
+					selectMode.onClick(MockCursorEvent({ lng: 2.5, lat: 2.5 }));
+
+					expect(onSelect).toHaveBeenCalledTimes(1);
+					expect(onDeselect).toHaveBeenCalledTimes(0);
+				});
+
 				it("does not select if feature is not clicked", () => {
 					// Square Polygon
 					addPolygonToStore([
@@ -408,12 +542,9 @@ describe("TerraDrawSelectMode", () => {
 					expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 					// Polygon selected set to true
-					expect(onChange).toHaveBeenNthCalledWith(
-						2,
-						idOne,
-						"update",
-						undefined,
-					);
+					expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+						target: "properties",
+					});
 
 					// Create selection points
 					expect(onChange).toHaveBeenNthCalledWith(
@@ -431,7 +562,7 @@ describe("TerraDrawSelectMode", () => {
 					);
 				});
 
-				it("creates midpoints when flag enabled", () => {
+				it("creates midpoints when flag enabled and feature selected", () => {
 					setSelectMode({
 						flags: {
 							polygon: {
@@ -468,12 +599,9 @@ describe("TerraDrawSelectMode", () => {
 					expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 					// Polygon selected set to true
-					expect(onChange).toHaveBeenNthCalledWith(
-						2,
-						idOne,
-						"update",
-						undefined,
-					);
+					expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+						target: "properties",
+					});
 
 					// Create selection points
 					expect(onChange).toHaveBeenNthCalledWith(
@@ -502,6 +630,212 @@ describe("TerraDrawSelectMode", () => {
 						"create",
 						undefined,
 					);
+				});
+
+				it("inserts a midpoint coordinate when flag enabled and midpoint clicked", () => {
+					setSelectMode({
+						flags: {
+							polygon: {
+								feature: {
+									draggable: false,
+									coordinates: { draggable: false, midpoints: true },
+								},
+							},
+						},
+					});
+
+					addPolygonToStore([
+						[0, 0],
+						[0, 1],
+						[1, 1],
+						[1, 0],
+						[0, 0],
+					]);
+
+					expect(onChange).toHaveBeenNthCalledWith(
+						1,
+						[expect.any(String)],
+						"create",
+						undefined,
+					);
+
+					// Store the ids of the created feature
+					const idOne = onChange.mock.calls[0][0] as string[];
+
+					// Select polygon
+					selectMode.onClick(MockCursorEvent({ lng: 0.5, lat: 0.5 }));
+
+					expect(onSelect).toHaveBeenCalledTimes(1);
+					expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
+
+					// Polygon selected set to true
+					expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+						target: "properties",
+					});
+
+					// Create midpoint by clicking on it
+					selectMode.onClick(MockCursorEvent({ lng: 0, lat: 0.5 }));
+
+					expect(onFinish).toHaveBeenCalledTimes(1);
+					expect(onFinish).toHaveBeenNthCalledWith(1, idOne[0], {
+						action: "insertMidpoint",
+						mode: "select",
+					});
+				});
+
+				it("sets insert cursor near midpoint on mouse move, then inserts on click on exact midpoint", () => {
+					setSelectMode({
+						pointerDistance: 10,
+						flags: {
+							polygon: {
+								feature: {
+									draggable: false,
+									coordinates: { draggable: false, midpoints: true },
+								},
+							},
+						},
+					});
+
+					addPolygonToStore([
+						[0, 0],
+						[0, 1],
+						[1, 1],
+						[1, 0],
+						[0, 0],
+					]);
+
+					const polygonId = (onChange.mock.calls[0][0] as string[])[0];
+					const before =
+						store.getGeometryCopy<Polygon>(polygonId).coordinates[0];
+
+					// Select polygon first so midpoints exist
+					selectMode.onClick(MockCursorEvent({ lng: 0.5, lat: 0.5 }));
+
+					const midpoints = store
+						.copyAll()
+						.filter(
+							(f) =>
+								f.geometry.type === "Point" &&
+								f.properties?.[SELECT_PROPERTIES.MID_POINT],
+						);
+					expect(midpoints.length).toBeGreaterThan(0);
+
+					// Take the first midpoint coordinate for testing
+					const midPointFeature = midpoints[0];
+					if (midPointFeature.geometry.type !== "Point") {
+						throw new Error(
+							"Expected midpoint guidance point geometry to be Point",
+						);
+					}
+					const midPointCoordinate: Position =
+						midPointFeature.geometry.coordinates;
+
+					setCursor.mockClear();
+
+					// Move near an actual midpoint
+					selectMode.onMouseMove(
+						MockCursorEvent({
+							lng: midPointCoordinate[0],
+							lat: midPointCoordinate[1],
+						}),
+					);
+
+					expect(setCursor).toHaveBeenCalledTimes(1);
+					expect(setCursor).toHaveBeenCalledWith("crosshair");
+
+					// Click the same place to insert the midpoint coordinate
+					selectMode.onClick(
+						MockCursorEvent({
+							lng: midPointCoordinate[0],
+							lat: midPointCoordinate[1],
+						}),
+					);
+
+					const after =
+						store.getGeometryCopy<Polygon>(polygonId).coordinates[0];
+					expect(after.length).toBe(before.length + 1);
+					expect(
+						after.some(
+							(c: Position) =>
+								c[0] === midPointCoordinate[0] &&
+								c[1] === midPointCoordinate[1],
+						),
+					).toBe(true);
+				});
+
+				it("sets insert cursor near midpoint on mouse move, then inserts on click near midpoint", () => {
+					setSelectMode({
+						pointerDistance: 10,
+						flags: {
+							polygon: {
+								feature: {
+									draggable: false,
+									coordinates: { draggable: false, midpoints: true },
+								},
+							},
+						},
+					});
+
+					addPolygonToStore([
+						[0, 0],
+						[0, 1],
+						[1, 1],
+						[1, 0],
+						[0, 0],
+					]);
+
+					const polygonId = (onChange.mock.calls[0][0] as string[])[0];
+					const before =
+						store.getGeometryCopy<Polygon>(polygonId).coordinates[0];
+
+					// Select polygon first so midpoints exist
+					selectMode.onClick(MockCursorEvent({ lng: 0.5, lat: 0.5 }));
+
+					const midpoints = store
+						.copyAll()
+						.filter(
+							(f) =>
+								f.geometry.type === "Point" &&
+								f.properties?.[SELECT_PROPERTIES.MID_POINT],
+						);
+					expect(midpoints.length).toBeGreaterThan(0);
+
+					// Take the first midpoint coordinate for testing
+					const midPointFeature = midpoints[0];
+					if (midPointFeature.geometry.type !== "Point") {
+						throw new Error(
+							"Expected midpoint guidance point geometry to be Point",
+						);
+					}
+					const midPointCoordinate: Position =
+						midPointFeature.geometry.coordinates;
+
+					setCursor.mockClear();
+
+					const event = MockCursorEvent({
+						lng: midPointCoordinate[0] + 0.00001,
+						lat: midPointCoordinate[1] + 0.00001,
+					});
+
+					// Move near an actual midpoint
+					selectMode.onMouseMove(event);
+
+					expect(setCursor).toHaveBeenCalledTimes(1);
+					expect(setCursor).toHaveBeenCalledWith("crosshair");
+
+					// Click the same place to insert the midpoint coordinate
+					selectMode.onClick(event);
+
+					const after =
+						store.getGeometryCopy<Polygon>(polygonId).coordinates[0];
+					expect(after.length).toBe(before.length + 1);
+					expect(
+						after.some(
+							(c: Position) =>
+								c[0] === midPointCoordinate[0] &&
+								c[1] === midPointCoordinate[1],
+						),
+					).toBe(true);
 				});
 
 				describe("switch selected", () => {
@@ -558,12 +892,9 @@ describe("TerraDrawSelectMode", () => {
 						expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 						// First polygon selected set to true
-						expect(onChange).toHaveBeenNthCalledWith(
-							3,
-							idOne,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", {
+							target: "properties",
+						});
 
 						// Deselect first polygon, select second
 						selectMode.onClick(
@@ -582,20 +913,14 @@ describe("TerraDrawSelectMode", () => {
 						expect(onDeselect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 						// First polygon selected set to false
-						expect(onChange).toHaveBeenNthCalledWith(
-							4,
-							idOne,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(4, idOne, "update", {
+							target: "properties",
+						});
 
 						// Second polygon selected set to true
-						expect(onChange).toHaveBeenNthCalledWith(
-							5,
-							idTwo,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(5, idTwo, "update", {
+							target: "properties",
+						});
 					});
 
 					it("with selection points flag", () => {
@@ -656,12 +981,9 @@ describe("TerraDrawSelectMode", () => {
 						expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 						// First polygon selected set to true
-						expect(onChange).toHaveBeenNthCalledWith(
-							3,
-							idOne,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", {
+							target: "properties",
+						});
 
 						// Create selection points
 						expect(onChange).toHaveBeenNthCalledWith(
@@ -694,12 +1016,9 @@ describe("TerraDrawSelectMode", () => {
 						expect(onDeselect).toHaveBeenCalledTimes(1);
 						expect(onDeselect).toHaveBeenNthCalledWith(1, idOne[0]);
 
-						expect(onChange).toHaveBeenNthCalledWith(
-							5,
-							idOne,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(5, idOne, "update", {
+							target: "properties",
+						});
 
 						// Delete first polygon selection points
 						expect(onChange).toHaveBeenNthCalledWith(
@@ -716,12 +1035,9 @@ describe("TerraDrawSelectMode", () => {
 						);
 
 						// Second polygon selected set to true
-						expect(onChange).toHaveBeenNthCalledWith(
-							7,
-							idTwo,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(7, idTwo, "update", {
+							target: "properties",
+						});
 					});
 
 					it("with mid points flag", () => {
@@ -782,12 +1098,9 @@ describe("TerraDrawSelectMode", () => {
 						expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 						// First polygon selected set to true
-						expect(onChange).toHaveBeenNthCalledWith(
-							3,
-							idOne,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", {
+							target: "properties",
+						});
 
 						// Create selection points
 						expect(onChange).toHaveBeenNthCalledWith(
@@ -833,12 +1146,9 @@ describe("TerraDrawSelectMode", () => {
 						expect(onDeselect).toHaveBeenCalledTimes(1);
 						expect(onDeselect).toHaveBeenNthCalledWith(1, idOne[0]);
 
-						expect(onChange).toHaveBeenNthCalledWith(
-							6,
-							idOne,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(6, idOne, "update", {
+							target: "properties",
+						});
 
 						// Delete first polygon selection points
 						expect(onChange).toHaveBeenNthCalledWith(
@@ -868,12 +1178,9 @@ describe("TerraDrawSelectMode", () => {
 						);
 
 						// Second polygon selected set to true
-						expect(onChange).toHaveBeenNthCalledWith(
-							9,
-							idTwo,
-							"update",
-							undefined,
-						);
+						expect(onChange).toHaveBeenNthCalledWith(9, idTwo, "update", {
+							target: "properties",
+						});
 					});
 				});
 			});
@@ -940,7 +1247,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "getGeometryCopy");
 				jest.spyOn(store, "getPropertiesCopy");
@@ -992,7 +1301,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "getGeometryCopy");
 				jest.spyOn(store, "updateGeometry");
@@ -1007,6 +1318,8 @@ describe("TerraDrawSelectMode", () => {
 				// Only called for checking distance to selection points,
 				// should hit early return otherwise
 				expect(store.getGeometryCopy).toHaveBeenCalledTimes(4);
+
+				expect(onFinish).not.toHaveBeenCalled();
 			});
 
 			it("returns early if creates a invalid polygon by deleting coordinate", () => {
@@ -1047,7 +1360,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "delete");
 				jest.spyOn(store, "updateGeometry");
@@ -1093,7 +1408,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "delete");
 				jest.spyOn(store, "updateGeometry");
@@ -1103,6 +1420,11 @@ describe("TerraDrawSelectMode", () => {
 
 				expect(store.delete).toHaveBeenCalledTimes(1);
 				expect(store.updateGeometry).toHaveBeenCalledTimes(1);
+				expect(onFinish).toHaveBeenCalledTimes(1);
+				expect(onFinish).toHaveBeenCalledWith(expect.any(String), {
+					action: "deleteCoordinate",
+					mode: "select",
+				});
 			});
 		});
 
@@ -1180,7 +1502,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "getGeometryCopy");
 				jest.spyOn(store, "getPropertiesCopy");
@@ -1237,7 +1561,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "getGeometryCopy");
 				jest.spyOn(store, "updateGeometry");
@@ -1300,7 +1626,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "delete");
 				jest.spyOn(store, "updateGeometry");
@@ -1351,7 +1679,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// First polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+					target: "properties",
+				});
 
 				jest.spyOn(store, "delete");
 				jest.spyOn(store, "updateGeometry");
@@ -1387,7 +1717,7 @@ describe("TerraDrawSelectMode", () => {
 					2,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				expect(onSelect).toHaveBeenCalledTimes(1);
@@ -1628,12 +1958,9 @@ describe("TerraDrawSelectMode", () => {
 					);
 
 					expect(onChange).toHaveBeenCalledTimes(3);
-					expect(onChange).toHaveBeenNthCalledWith(
-						3,
-						idOne,
-						"update",
-						undefined,
-					);
+					expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", {
+						target: "geometry",
+					});
 				});
 			});
 
@@ -1674,12 +2001,9 @@ describe("TerraDrawSelectMode", () => {
 					);
 
 					expect(onChange).toHaveBeenCalledTimes(3);
-					expect(onChange).toHaveBeenNthCalledWith(
-						3,
-						idOne,
-						"update",
-						undefined,
-					);
+					expect(onChange).toHaveBeenNthCalledWith(3, idOne, "update", {
+						target: "geometry",
+					});
 				});
 			});
 		});
@@ -1712,7 +2036,7 @@ describe("TerraDrawSelectMode", () => {
 					3,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -1731,15 +2055,19 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
-
 				// Update linestring position and 1 selection points
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					5,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					6,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 
@@ -1773,7 +2101,7 @@ describe("TerraDrawSelectMode", () => {
 					3,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -1797,15 +2125,20 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
-
 				// Update linestring position and 1 selection points
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					5,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+
+				expect(onChange).toHaveBeenNthCalledWith(
+					6,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 
@@ -1853,7 +2186,7 @@ describe("TerraDrawSelectMode", () => {
 					4,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -1877,9 +2210,7 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(6);
-
-				expect(store.updateGeometry).toHaveBeenCalledTimes(1);
+				expect(store.updateGeometry).toHaveBeenCalledTimes(2);
 				expect(store.updateGeometry).toHaveBeenNthCalledWith(1, [
 					{
 						geometry: {
@@ -1896,6 +2227,8 @@ describe("TerraDrawSelectMode", () => {
 						},
 						id: expect.any(String),
 					},
+				]);
+				expect(store.updateGeometry).toHaveBeenNthCalledWith(2, [
 					{
 						geometry: {
 							coordinates: [2, 2],
@@ -1909,9 +2242,15 @@ describe("TerraDrawSelectMode", () => {
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					6,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					7,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 
@@ -1957,7 +2296,7 @@ describe("TerraDrawSelectMode", () => {
 					4,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -1981,9 +2320,7 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(6);
-
-				expect(store.updateGeometry).toHaveBeenCalledTimes(1);
+				expect(store.updateGeometry).toHaveBeenCalledTimes(2);
 				expect(store.updateGeometry).toHaveBeenNthCalledWith(1, [
 					{
 						geometry: {
@@ -1997,6 +2334,8 @@ describe("TerraDrawSelectMode", () => {
 						},
 						id: expect.any(String),
 					},
+				]);
+				expect(store.updateGeometry).toHaveBeenNthCalledWith(2, [
 					{
 						geometry: {
 							coordinates: [2, 2],
@@ -2010,9 +2349,15 @@ describe("TerraDrawSelectMode", () => {
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					6,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					7,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 
@@ -2067,7 +2412,7 @@ describe("TerraDrawSelectMode", () => {
 					4,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -2091,9 +2436,7 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(6);
-
-				expect(store.updateGeometry).toHaveBeenCalledTimes(1);
+				expect(store.updateGeometry).toHaveBeenCalledTimes(2);
 				expect(store.updateGeometry).toHaveBeenNthCalledWith(1, [
 					{
 						geometry: {
@@ -2110,6 +2453,8 @@ describe("TerraDrawSelectMode", () => {
 						},
 						id: expect.any(String),
 					},
+				]);
+				expect(store.updateGeometry).toHaveBeenNthCalledWith(2, [
 					{
 						geometry: {
 							coordinates: [2, 2],
@@ -2123,9 +2468,15 @@ describe("TerraDrawSelectMode", () => {
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					6,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					7,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 
@@ -2178,7 +2529,7 @@ describe("TerraDrawSelectMode", () => {
 					4,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -2202,9 +2553,7 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(6);
-
-				expect(store.updateGeometry).toHaveBeenCalledTimes(1);
+				expect(store.updateGeometry).toHaveBeenCalledTimes(2);
 				expect(store.updateGeometry).toHaveBeenNthCalledWith(1, [
 					{
 						geometry: {
@@ -2218,6 +2567,9 @@ describe("TerraDrawSelectMode", () => {
 						},
 						id: expect.any(String),
 					},
+				]);
+
+				expect(store.updateGeometry).toHaveBeenNthCalledWith(2, [
 					{
 						geometry: {
 							coordinates: [2, 2],
@@ -2231,9 +2583,15 @@ describe("TerraDrawSelectMode", () => {
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					6,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					7,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 
@@ -2288,7 +2646,7 @@ describe("TerraDrawSelectMode", () => {
 					4,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -2312,9 +2670,7 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(6);
-
-				expect(store.updateGeometry).toHaveBeenCalledTimes(1);
+				expect(store.updateGeometry).toHaveBeenCalledTimes(2);
 				expect(store.updateGeometry).toHaveBeenNthCalledWith(1, [
 					{
 						geometry: {
@@ -2331,6 +2687,9 @@ describe("TerraDrawSelectMode", () => {
 						},
 						id: expect.any(String),
 					},
+				]);
+
+				expect(store.updateGeometry).toHaveBeenNthCalledWith(2, [
 					{
 						geometry: {
 							coordinates: [45, 45],
@@ -2344,9 +2703,16 @@ describe("TerraDrawSelectMode", () => {
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					6,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+
+				expect(onChange).toHaveBeenNthCalledWith(
+					7,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 		});
@@ -2386,7 +2752,7 @@ describe("TerraDrawSelectMode", () => {
 					3,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -2410,19 +2776,23 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(6);
-
 				// Update linestring position and 1 selection points
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					5,
-					[expect.any(String), expect.any(String), expect.any(String)],
+					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					6,
+					[expect.any(String), expect.any(String)],
+					"update",
+					{ target: "geometry" },
 				);
 			});
 
-			it("CreateCursorEvent({ lng: 0, lat: 0 })", () => {
+			it("does trigger drag events if mode is draggable for polygon", () => {
 				setSelectMode({
 					flags: {
 						polygon: {
@@ -2461,7 +2831,7 @@ describe("TerraDrawSelectMode", () => {
 					3,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 
 				// Create selection points
@@ -2490,21 +2860,25 @@ describe("TerraDrawSelectMode", () => {
 					setMapDraggability,
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(6);
-
 				// Update polygon position and 1 selection points
 				// that gets moved
 				expect(onChange).toHaveBeenNthCalledWith(
 					5,
+					[expect.any(String)],
+					"update",
+					{ target: "geometry" },
+				);
+
+				expect(onChange).toHaveBeenNthCalledWith(
+					6,
 					[
-						expect.any(String),
 						expect.any(String),
 						expect.any(String),
 						expect.any(String),
 						expect.any(String),
 					],
 					"update",
-					undefined,
+					{ target: "geometry" },
 				);
 			});
 		});
@@ -2552,7 +2926,9 @@ describe("TerraDrawSelectMode", () => {
 				expect(onSelect).toHaveBeenNthCalledWith(1, idOne[0]);
 
 				// Polygon selected set to true
-				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(2, idOne, "update", {
+					target: "properties",
+				});
 
 				// Create mid points
 				expect(onChange).toHaveBeenNthCalledWith(
@@ -2576,7 +2952,9 @@ describe("TerraDrawSelectMode", () => {
 
 				expect(onChange).toHaveBeenCalledTimes(8);
 
-				expect(onChange).toHaveBeenNthCalledWith(5, idOne, "update", undefined);
+				expect(onChange).toHaveBeenNthCalledWith(5, idOne, "update", {
+					target: "geometry",
+				});
 
 				// Delete existing midpoints and selection points
 				expect(onChange).toHaveBeenNthCalledWith(
@@ -2595,39 +2973,27 @@ describe("TerraDrawSelectMode", () => {
 					undefined,
 				);
 
-				// Mid points
-				expect(onChange).toHaveBeenNthCalledWith(
-					7,
-					[
-						expect.any(String),
-						expect.any(String),
-						expect.any(String),
-						expect.any(String),
-						expect.any(String),
-					],
-					"create",
-					undefined,
-				);
+				const midpoints = store
+					.copyAll()
+					.filter((f) => f.properties?.[SELECT_PROPERTIES.MID_POINT]);
+				expect(midpoints.length).toBe(5);
 
-				// Selection points
-				expect(onChange).toHaveBeenNthCalledWith(
-					8,
-					[
-						expect.any(String),
-						expect.any(String),
-						expect.any(String),
-						expect.any(String),
-						expect.any(String),
-					],
-					"create",
-					undefined,
-				);
+				const selectionPoints = store
+					.copyAll()
+					.filter((f) => f.properties?.[SELECT_PROPERTIES.SELECTION_POINT]);
+				expect(selectionPoints.length).toBe(5);
 
 				const setMapDraggability = jest.fn();
 				selectMode.onDrag(
 					MockCursorEvent({ lng: 0, lat: 0.5 }),
 					setMapDraggability,
 				);
+
+				expect(onFinish).toHaveBeenCalledTimes(1);
+				expect(onFinish).toHaveBeenCalledWith(expect.any(String), {
+					action: "insertMidpoint",
+					mode: "select",
+				});
 			});
 		});
 	});
@@ -2678,7 +3044,7 @@ describe("TerraDrawSelectMode", () => {
 				3,
 				[expect.any(String)],
 				"update",
-				undefined,
+				{ target: "properties" },
 			);
 
 			// Create selection points
@@ -2794,7 +3160,7 @@ describe("TerraDrawSelectMode", () => {
 				3,
 				[expect.any(String)],
 				"update",
-				undefined,
+				{ target: "properties" },
 			);
 
 			// Create selection points
@@ -2833,7 +3199,9 @@ describe("TerraDrawSelectMode", () => {
 
 	describe("onMouseMove", () => {
 		let selectMode: TerraDrawSelectMode;
+		let store: TerraDrawGeoJSONStore;
 		let onChange: jest.Mock;
+		let setCursor: jest.Mock;
 		let project: jest.Mock;
 		let onSelect: jest.Mock;
 		let onDeselect: jest.Mock;
@@ -2843,12 +3211,36 @@ describe("TerraDrawSelectMode", () => {
 
 			const mockConfig = MockModeConfig(selectMode.mode);
 			onChange = mockConfig.onChange;
+			setCursor = mockConfig.setCursor;
 			project = mockConfig.project;
 			onSelect = mockConfig.onSelect;
 			onDeselect = mockConfig.onDeselect;
+			store = mockConfig.store;
 
 			selectMode.register(mockConfig);
 		});
+
+		const addPolygonFeature = () => {
+			return store.create([
+				{
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							[
+								[0, 0],
+								[0, 100],
+								[100, 100],
+								[100, 0],
+								[0, 0],
+							],
+						],
+					},
+					properties: {
+						mode: "polygon",
+					},
+				},
+			])[0];
+		};
 
 		it("does nothing", () => {
 			selectMode.onMouseMove(
@@ -2862,6 +3254,136 @@ describe("TerraDrawSelectMode", () => {
 			expect(onDeselect).toHaveBeenCalledTimes(0);
 			expect(onSelect).toHaveBeenCalledTimes(0);
 			expect(project).toHaveBeenCalledTimes(0);
+		});
+
+		it("uses specific hover cursors for feature, coordinate and resize handle", () => {
+			selectMode = new TerraDrawSelectMode({
+				cursors: {
+					pointerOver: "move",
+					pointerOverFeature: "grab",
+					pointerOverCoordinate: "pointer",
+					pointerOverResizeHandle: "wait",
+				},
+				flags: {
+					polygon: {
+						feature: {
+							draggable: true,
+							coordinates: {
+								draggable: true,
+								resizable: "center",
+							},
+						},
+					},
+				},
+			});
+
+			let mockConfig = MockModeConfig(selectMode.mode);
+			setCursor = mockConfig.setCursor;
+			store = mockConfig.store;
+			selectMode.register(mockConfig);
+
+			addPolygonFeature();
+			selectMode.onClick(MockCursorEvent({ lng: 50, lat: 50 }));
+
+			setCursor.mockClear();
+			selectMode.onMouseMove(MockCursorEvent({ lng: 50, lat: 50 }));
+			expect(setCursor).toHaveBeenCalledWith("grab");
+
+			setCursor.mockClear();
+			selectMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 0 }));
+			expect(setCursor).toHaveBeenCalledWith("pointer");
+
+			selectMode = new TerraDrawSelectMode({
+				cursors: {
+					pointerOver: "move",
+					pointerOverResizeHandle: "wait",
+				},
+				flags: {
+					polygon: {
+						feature: {
+							coordinates: {
+								draggable: false,
+								resizable: "center",
+							},
+						},
+					},
+				},
+			});
+
+			mockConfig = MockModeConfig(selectMode.mode);
+			setCursor = mockConfig.setCursor;
+			store = mockConfig.store;
+			selectMode.register(mockConfig);
+
+			addPolygonFeature();
+			selectMode.onClick(MockCursorEvent({ lng: 50, lat: 50 }));
+
+			setCursor.mockClear();
+			selectMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 0 }));
+			expect(setCursor).toHaveBeenCalledWith("wait");
+		});
+
+		it("falls back to pointerOver for feature, coordinate and resize handle", () => {
+			selectMode = new TerraDrawSelectMode({
+				cursors: {
+					pointerOver: "crosshair",
+				},
+				flags: {
+					polygon: {
+						feature: {
+							draggable: true,
+							coordinates: {
+								draggable: true,
+								resizable: "center",
+							},
+						},
+					},
+				},
+			});
+
+			let mockConfig = MockModeConfig(selectMode.mode);
+			setCursor = mockConfig.setCursor;
+			store = mockConfig.store;
+			selectMode.register(mockConfig);
+
+			addPolygonFeature();
+			selectMode.onClick(MockCursorEvent({ lng: 50, lat: 50 }));
+
+			setCursor.mockClear();
+			selectMode.onMouseMove(MockCursorEvent({ lng: 50, lat: 50 }));
+			expect(setCursor).toHaveBeenCalledWith("crosshair");
+
+			setCursor.mockClear();
+			selectMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 0 }));
+			expect(setCursor).toHaveBeenCalledWith("crosshair");
+
+			selectMode = new TerraDrawSelectMode({
+				cursors: {
+					pointerOver: "crosshair",
+				},
+				flags: {
+					polygon: {
+						feature: {
+							coordinates: {
+								draggable: false,
+								resizable: "center",
+							},
+						},
+					},
+				},
+			});
+
+			mockConfig = MockModeConfig(selectMode.mode);
+			setCursor = mockConfig.setCursor;
+			store = mockConfig.store;
+			selectMode.register(mockConfig);
+
+			addPolygonFeature();
+			selectMode.onClick(MockCursorEvent({ lng: 50, lat: 50 }));
+
+			setCursor.mockClear();
+			selectMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 0 }));
+			expect(setCursor).toHaveBeenCalledWith("crosshair");
 		});
 	});
 
@@ -2921,7 +3443,7 @@ describe("TerraDrawSelectMode", () => {
 
 	describe("styleFeature", () => {
 		it("returns the correct styles for polygon from polygon mode", () => {
-			const polygonMode = new TerraDrawSelectMode({
+			const selectMode = new TerraDrawSelectMode({
 				styles: {
 					selectedPolygonOutlineWidth: 4,
 					selectedPolygonColor: "#222222",
@@ -2932,7 +3454,7 @@ describe("TerraDrawSelectMode", () => {
 			});
 
 			expect(
-				polygonMode.styleFeature({
+				selectMode.styleFeature({
 					type: "Feature",
 					geometry: { type: "Polygon", coordinates: [] },
 					properties: { mode: "polygon", selected: true },
@@ -2946,7 +3468,7 @@ describe("TerraDrawSelectMode", () => {
 			});
 
 			expect(
-				polygonMode.styleFeature({
+				selectMode.styleFeature({
 					type: "Feature",
 					geometry: { type: "Polygon", coordinates: [] },
 					properties: { mode: "polygon" },
@@ -3008,6 +3530,188 @@ describe("TerraDrawSelectMode", () => {
 				}),
 			).toMatchObject({
 				zIndex: 10,
+			});
+		});
+
+		it("returns the default styles for polygon from polygon mode when using a function that returns undefined", () => {
+			const polygonMode = new TerraDrawSelectMode({
+				styles: {
+					selectedPolygonOutlineWidth: () => undefined,
+					selectedPolygonColor: () => undefined,
+					selectedPolygonOutlineColor: () => undefined,
+					selectedPolygonFillOpacity: () => undefined,
+				},
+			});
+
+			expect(
+				polygonMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Polygon", coordinates: [] },
+					properties: { mode: "polygon", selected: true },
+				}),
+			).toMatchObject({
+				polygonFillColor: "#3f97e0",
+				polygonOutlineColor: "#3f97e0",
+				polygonOutlineWidth: 4,
+				polygonFillOpacity: 0.3,
+			});
+
+			expect(
+				polygonMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Polygon", coordinates: [] },
+					properties: { mode: "polygon" },
+				}),
+			).toMatchObject({
+				polygonFillColor: "#3f97e0",
+				polygonFillOpacity: 0.3,
+				polygonOutlineColor: "#3f97e0",
+			});
+		});
+
+		it("returns the default styles for linestring from linestring mode when using a function that returns undefined", () => {
+			const lineStringMode = new TerraDrawSelectMode({
+				styles: {
+					selectedLineStringColor: () => undefined,
+					selectedLineStringWidth: () => undefined,
+					selectedLineStringOpacity: () => undefined,
+				},
+			});
+
+			expect(
+				lineStringMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "LineString", coordinates: [] },
+					properties: { mode: "linestring", selected: true },
+				}),
+			).toMatchObject({
+				lineStringColor: "#3f97e0",
+				lineStringWidth: 4,
+				lineStringOpacity: 1,
+			});
+
+			expect(
+				lineStringMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "LineString", coordinates: [] },
+					properties: { mode: "linestring" },
+				}),
+			).toMatchObject({
+				lineStringColor: "#3f97e0",
+				lineStringWidth: 4,
+				lineStringOpacity: 1,
+			});
+		});
+
+		it("returns the default styles for point from point mode when using a function that returns undefined", () => {
+			const pointMode = new TerraDrawSelectMode({
+				styles: {
+					selectedPointColor: () => undefined,
+					selectedPointOutlineWidth: () => undefined,
+					selectedPointOpacity: () => undefined,
+				},
+			});
+
+			expect(
+				pointMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [] },
+					properties: { mode: "point", selected: true },
+				}),
+			).toMatchObject({
+				pointColor: "#3f97e0",
+				pointOpacity: 1,
+				pointOutlineOpacity: 1,
+				pointOutlineWidth: 0,
+			});
+
+			expect(
+				pointMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [] },
+					properties: { mode: "point" },
+				}),
+			).toMatchObject({
+				pointColor: "#3f97e0",
+				pointOpacity: 1,
+				pointOutlineColor: "#ffffff",
+				pointOutlineOpacity: 1,
+			});
+		});
+
+		it("returns correct styles for marker from marker mode", () => {
+			const selectMode = new TerraDrawSelectMode({
+				styles: {
+					selectedMarkerUrl: "https://www.example.com/selected.png",
+					selectedMarkerHeight: 40,
+					selectedMarkerWidth: 40,
+				},
+			});
+
+			expect(
+				selectMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [0, 0] },
+					properties: {
+						mode: "marker",
+						[COMMON_PROPERTIES.MARKER]: true,
+						selected: true,
+					},
+				}),
+			).toMatchObject({
+				markerUrl: "https://www.example.com/selected.png",
+				markerHeight: 40,
+				markerWidth: 40,
+			});
+
+			expect(
+				selectMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [0, 0] },
+					properties: { mode: "marker", [COMMON_PROPERTIES.MARKER]: true },
+				}),
+			).toMatchObject({
+				markerUrl: undefined,
+				markerHeight: undefined,
+				markerWidth: undefined,
+			});
+		});
+
+		it("returns correct styles for marker from marker mode when using a function", () => {
+			const selectMode = new TerraDrawSelectMode({
+				styles: {
+					selectedMarkerUrl: () => "https://www.example.com/selected.png",
+					selectedMarkerHeight: () => 40,
+					selectedMarkerWidth: () => 40,
+				},
+			});
+
+			expect(
+				selectMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [0, 0] },
+					properties: {
+						mode: "marker",
+						[COMMON_PROPERTIES.MARKER]: true,
+						selected: true,
+					},
+				}),
+			).toMatchObject({
+				markerUrl: "https://www.example.com/selected.png",
+				markerHeight: 40,
+				markerWidth: 40,
+			});
+
+			expect(
+				selectMode.styleFeature({
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [0, 0] },
+					properties: { mode: "marker", [COMMON_PROPERTIES.MARKER]: true },
+				}),
+			).toMatchObject({
+				markerUrl: undefined,
+				markerHeight: undefined,
+				markerWidth: undefined,
 			});
 		});
 	});

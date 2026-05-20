@@ -10,11 +10,16 @@ import {
 	UpdateTypes,
 	Z_INDEX,
 	Snapping,
+	UrlStyling,
+	COMMON_PROPERTIES,
+	MARKER_URL_DEFAULT,
+	FinishActions,
 } from "../../common";
-import { Point, Position } from "geojson";
+import { LineString, Point, Polygon, Position } from "geojson";
 import {
 	BaseModeOptions,
 	CustomStyling,
+	ModeUpdateOptions,
 	TerraDrawBaseSelectMode,
 } from "../base.mode";
 import { MidPointBehavior } from "./behaviors/midpoint.behavior";
@@ -39,6 +44,8 @@ import {
 import { CoordinatePointBehavior } from "./behaviors/coordinate-point.behavior";
 import { CoordinateSnappingBehavior } from "../coordinate-snapping.behavior";
 import { LineSnappingBehavior } from "../line-snapping.behavior";
+import { MutateFeatureBehavior, Mutations } from "../mutate-feature.behavior";
+import { ReadFeatureBehavior } from "../read-feature.behavior";
 
 type TerraDrawSelectModeKeyEvents = {
 	deselect: KeyboardEvent["key"] | null;
@@ -79,30 +86,43 @@ type SelectionStyling = {
 	// Point
 	selectedPointColor: HexColorStyling;
 	selectedPointWidth: NumericStyling;
+	selectedPointOpacity: NumericStyling;
 	selectedPointOutlineColor: HexColorStyling;
 	selectedPointOutlineWidth: NumericStyling;
+	selectedPointOutlineOpacity: NumericStyling;
+
+	// Marker
+	selectedMarkerUrl: UrlStyling;
+	selectedMarkerHeight: NumericStyling;
+	selectedMarkerWidth: NumericStyling;
 
 	// LineString
 	selectedLineStringColor: HexColorStyling;
 	selectedLineStringWidth: NumericStyling;
+	selectedLineStringOpacity: NumericStyling;
 
 	// Polygon
 	selectedPolygonColor: HexColorStyling;
 	selectedPolygonFillOpacity: NumericStyling;
 	selectedPolygonOutlineColor: HexColorStyling;
+	selectedPolygonOutlineOpacity: NumericStyling;
 	selectedPolygonOutlineWidth: NumericStyling;
 
 	// Selection Points (points at vertices of a polygon/linestring feature)
 	selectionPointWidth: NumericStyling;
 	selectionPointColor: HexColorStyling;
+	selectionPointOpacity: NumericStyling;
 	selectionPointOutlineColor: HexColorStyling;
 	selectionPointOutlineWidth: NumericStyling;
+	selectionPointOutlineOpacity: NumericStyling;
 
 	// Mid points (points at mid point of a polygon/linestring feature)
 	midPointColor: HexColorStyling;
 	midPointOutlineColor: HexColorStyling;
+	midPointOpacity: NumericStyling;
 	midPointWidth: NumericStyling;
 	midPointOutlineWidth: NumericStyling;
+	midPointOutlineOpacity: NumericStyling;
 
 	zIndex: NumericStyling;
 };
@@ -110,6 +130,9 @@ type SelectionStyling = {
 interface Cursors {
 	pointerOverSelectionPoint?: Cursor;
 	pointerOver?: Cursor;
+	pointerOverFeature?: Cursor;
+	pointerOverCoordinate?: Cursor;
+	pointerOverResizeHandle?: Cursor;
 	dragStart?: Cursor;
 	dragEnd?: Cursor;
 	insertMidpoint?: Cursor;
@@ -131,12 +154,14 @@ interface TerraDrawSelectModeOptions<T extends CustomStyling>
 	dragEventThrottle?: number;
 	cursors?: Cursors;
 	allowManualDeselection?: boolean;
+	allowManualSelection?: boolean;
 }
 
 export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStyling> {
-	public mode = "select" as const;
+	public mode = "select";
 
 	private allowManualDeselection = true;
+	private allowManualSelection = true;
 	private dragEventThrottle = 5;
 	private dragEventCount = 0;
 	private selected: FeatureId[] = [];
@@ -145,6 +170,15 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 	private keyEvents: TerraDrawSelectModeKeyEvents = defaultKeyEvents;
 	private cursors: Required<Cursors> = defaultCursors;
 	private validations: Record<string, Validation> = {};
+
+	private dragTarget:
+		| { type: "none" }
+		| { type: "feature"; featureId: FeatureId }
+		| { type: "coordinate"; featureId: FeatureId; coordinateIndex: number }
+		| { type: "resize"; featureId: FeatureId; coordinateIndex: number }
+		| { type: "midpoint"; featureId: FeatureId; midPointId: FeatureId } = {
+		type: "none",
+	};
 
 	// Behaviors
 	private selectionPoints!: SelectionPointBehavior;
@@ -160,6 +194,25 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 	private dragCoordinateResizeFeature!: DragCoordinateResizeBehavior;
 	private coordinatePoints!: CoordinatePointBehavior;
 	private lineSnap!: LineSnappingBehavior;
+	private mutateFeature!: MutateFeatureBehavior;
+	private readFeature!: ReadFeatureBehavior;
+
+	private getPointerOverFeatureCursor() {
+		return this.cursors.pointerOverFeature ?? this.cursors.pointerOver;
+	}
+
+	private getPointerOverCoordinateCursor() {
+		// pointerOverSelectionPoint is a fork-specific alias kept for backward compatibility
+		return (
+			this.cursors.pointerOverCoordinate ??
+			this.cursors.pointerOverSelectionPoint ??
+			this.cursors.pointerOver
+		);
+	}
+
+	private getPointerOverResizeHandleCursor() {
+		return this.cursors.pointerOverResizeHandle ?? this.cursors.pointerOver;
+	}
 
 	constructor(options?: TerraDrawSelectModeOptions<SelectionStyling>) {
 		super(options, true);
@@ -167,7 +220,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 	}
 
 	override updateOptions(
-		options?: TerraDrawSelectModeOptions<SelectionStyling>,
+		options?: ModeUpdateOptions<TerraDrawSelectModeOptions<SelectionStyling>>,
 	) {
 		super.updateOptions(options);
 
@@ -198,6 +251,10 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.allowManualDeselection = options.allowManualDeselection;
 		}
 
+		if (options?.allowManualSelection !== undefined) {
+			this.allowManualSelection = options.allowManualSelection;
+		}
+
 		// Flags and Validations
 		if (options?.flags) {
 			this.flags = { ...this.flags, ...options.flags };
@@ -225,6 +282,20 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 	}
 
 	registerBehaviors(config: BehaviorConfig) {
+		this.readFeature = new ReadFeatureBehavior(config);
+		this.mutateFeature = new MutateFeatureBehavior(config, {
+			validate: (feature, context) => {
+				const mode = feature.properties.mode as string;
+
+				// By default all changes are valid
+				if (!this.validations || !this.validations[mode]) {
+					return { valid: true };
+				}
+
+				return this.validations[mode](feature, context);
+			},
+		});
+
 		this.pixelDistance = new PixelDistanceBehavior(config);
 		this.clickBoundingBox = new ClickBoundingBoxBehavior(config);
 		this.featuresAtMouseEvent = new FeatureAtPointerEventBehavior(
@@ -233,12 +304,22 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.pixelDistance,
 		);
 
-		this.selectionPoints = new SelectionPointBehavior(config);
-		this.coordinatePoints = new CoordinatePointBehavior(config);
+		this.selectionPoints = new SelectionPointBehavior(
+			config,
+			this.mutateFeature,
+		);
+		this.coordinatePoints = new CoordinatePointBehavior(
+			config,
+			this.readFeature,
+			this.mutateFeature,
+		);
 		this.midPoints = new MidPointBehavior(
 			config,
 			this.selectionPoints,
 			this.coordinatePoints,
+			this.mutateFeature,
+			this.readFeature,
+			this.pixelDistance,
 		);
 		this.coordinateSnap = new CoordinateSnappingBehavior(
 			config,
@@ -255,6 +336,8 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.selectionPoints,
 			this.midPoints,
 			this.coordinatePoints,
+			this.readFeature,
+			this.mutateFeature,
 		);
 
 		this.dragFeature = new DragFeatureBehavior(
@@ -263,6 +346,8 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.selectionPoints,
 			this.midPoints,
 			this.coordinatePoints,
+			this.readFeature,
+			this.mutateFeature,
 		);
 		this.dragCoordinate = new DragCoordinateBehavior(
 			config,
@@ -272,6 +357,8 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.coordinatePoints,
 			this.coordinateSnap,
 			this.lineSnap,
+			this.readFeature,
+			this.mutateFeature,
 		);
 		this.dragCoordinateResizeFeature = new DragCoordinateResizeBehavior(
 			config,
@@ -279,6 +366,8 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.selectionPoints,
 			this.midPoints,
 			this.coordinatePoints,
+			this.readFeature,
+			this.mutateFeature,
 		);
 		this.scaleFeature = new ScaleFeatureBehavior(
 			config,
@@ -286,25 +375,22 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		);
 	}
 
-	public deselectFeature() {
-		this.deselect();
+	public deselectFeature(id: FeatureId) {
+		this.deselect(id);
 	}
 
-	private deselect() {
-		const updateSelectedFeatures = this.selected
-			.filter((id) => this.store.has(id))
-			.map((id) => ({
-				id,
-				property: SELECT_PROPERTIES.SELECTED,
-				value: false,
-			}));
+	private deselect(id: FeatureId) {
+		if (!this.selected.includes(id)) {
+			return;
+		}
 
-		this.store.updateProperty(updateSelectedFeatures);
+		this.mutateFeature.setDeselected(this.selected);
 
 		this.onDeselect(this.selected[0]);
 		this.selected = [];
 		this.selectionPoints.delete();
 		this.midPoints.delete();
+		this.dragTarget = { type: "none" };
 	}
 
 	private deleteSelected() {
@@ -313,8 +399,42 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		// We don't need to set selected false
 		// as we're going to delete the feature
 
-		this.store.delete(this.selected);
+		if (this.selected.length) {
+			this.mutateFeature.deleteFeaturesIfPresent(this.selected);
+		}
+
 		this.selected = [];
+		this.dragTarget = { type: "none" };
+	}
+
+	private clearDragTargetAndCursor() {
+		this.dragTarget = { type: "none" };
+		this.setCursor("unset");
+	}
+
+	private getSelectedFlags(featureId: FeatureId) {
+		const properties = this.readFeature.getProperties(featureId);
+		const modeFlags = this.flags[properties.mode as string];
+
+		const featureFlags = modeFlags?.feature;
+
+		const coordinatesFlags = featureFlags?.coordinates;
+		const midpointsDraggable =
+			typeof coordinatesFlags?.midpoints === "object" &&
+			coordinatesFlags.midpoints.draggable;
+
+		const hasDraggableFlags =
+			featureFlags &&
+			(featureFlags.draggable ||
+				coordinatesFlags?.draggable ||
+				coordinatesFlags?.resizable ||
+				midpointsDraggable);
+
+		return {
+			featureFlags,
+			coordinatesFlags,
+			hasDraggableFlags,
+		};
 	}
 
 	private onRightClick(event: TerraDrawMouseEvent) {
@@ -327,7 +447,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		let clickedFeatureDistance = Infinity;
 
 		this.selectionPoints.ids.forEach((id) => {
-			const geometry = this.store.getGeometryCopy<Point>(id);
+			const geometry = this.readFeature.getGeometry<Point>(id);
 			const distance = this.pixelDistance.measure(event, geometry.coordinates);
 
 			if (
@@ -335,7 +455,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 				distance < clickedFeatureDistance
 			) {
 				clickedFeatureDistance = distance;
-				clickedSelectionPointProps = this.store.getPropertiesCopy(
+				clickedSelectionPointProps = this.readFeature.getProperties(
 					id,
 				) as SelectionPointProperties;
 			}
@@ -349,9 +469,8 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		const coordinateIndex = clickedSelectionPointProps.index;
 
 		// We allow for preventing deleting coordinates via flags
-		const properties = this.store.getPropertiesCopy(featureId);
+		const properties = this.readFeature.getProperties(featureId);
 		const modeFlags = this.flags[properties.mode as string];
-		const validation = this.validations[properties.mode as string];
 
 		// Check if we can actually delete the coordinate
 		const cannotDelete =
@@ -364,9 +483,9 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			return;
 		}
 
-		const geometry = this.store.getGeometryCopy(featureId);
+		const geometry = this.readFeature.getGeometry(featureId);
 
-		let coordinates;
+		let coordinates: Position[];
 		if (geometry.type === "Polygon") {
 			coordinates = geometry.coordinates[0];
 
@@ -381,10 +500,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			if (coordinates.length <= 2) {
 				return;
 			}
-		}
-
-		// Geometry is not Polygon or LineString
-		if (!coordinates) {
+		} else {
 			return;
 		}
 
@@ -404,47 +520,51 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			coordinates.splice(coordinateIndex, 1);
 		}
 
-		// Validate the new geometry
-		if (validation) {
-			const validationResult = validation(
-				{
-					id: featureId,
-					type: "Feature",
-					geometry,
-					properties,
+		let updated: GeoJSONStoreFeatures<Polygon | LineString> | null = null;
+
+		if (geometry.type === "Polygon") {
+			updated = this.mutateFeature.updatePolygon({
+				featureId,
+				coordinateMutations: {
+					type: Mutations.Replace,
+					coordinates: [coordinates],
 				},
-				{
-					project: this.project,
-					unproject: this.unproject,
-					coordinatePrecision: this.coordinatePrecision,
+				context: {
 					updateType: UpdateTypes.Commit,
 				},
-			);
-			if (!validationResult.valid) {
-				return;
-			}
+			});
+		} else if (geometry.type === "LineString") {
+			updated = this.mutateFeature.updateLineString({
+				featureId,
+				coordinateMutations: {
+					type: Mutations.Replace,
+					coordinates: coordinates,
+				},
+				context: {
+					updateType: UpdateTypes.Commit,
+				},
+			});
 		}
 
-		const deletePoints = [...this.midPoints.ids, ...this.selectionPoints.ids];
+		if (!updated) {
+			return;
+		}
 
-		this.store.delete(deletePoints);
+		const featureCoordinates = updated.geometry.coordinates;
 
-		this.store.updateGeometry([
-			{
-				id: featureId,
-				geometry,
-			},
+		this.mutateFeature.deleteFeaturesIfPresent([
+			...this.midPoints.ids,
+			...this.selectionPoints.ids,
 		]);
 
 		if (properties.coordinatePointIds) {
-			this.coordinatePoints.createOrUpdate(featureId);
+			this.coordinatePoints.createOrUpdate({ featureId, featureCoordinates });
 		}
 
-		this.selectionPoints.create(
-			coordinates,
-			geometry.type as "Polygon" | "LineString",
+		this.selectionPoints.create({
+			featureCoordinates,
 			featureId,
-		);
+		});
 
 		if (
 			modeFlags &&
@@ -452,8 +572,13 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			modeFlags.feature.coordinates &&
 			modeFlags.feature.coordinates.midpoints
 		) {
-			this.midPoints.create(coordinates, featureId, this.coordinatePrecision);
+			this.midPoints.create({ featureCoordinates, featureId });
 		}
+
+		this.onFinish(featureId, {
+			action: FinishActions.DeleteCoordinate,
+			mode: this.mode,
+		});
 	}
 
 	private select(featureId: FeatureId, fromCursor = true) {
@@ -461,7 +586,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			return;
 		}
 
-		const { mode } = this.store.getPropertiesCopy(featureId);
+		const { mode } = this.readFeature.getProperties(featureId);
 
 		// This will be undefined for points
 		const modeFlags = this.flags[mode as string];
@@ -481,70 +606,96 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			} else {
 				// If it's a different feature set selected
 				// to false on previously selected feature
-				this.deselect();
+				this.deselect(previouslySelectedId);
 			}
 		}
 
 		if (fromCursor) {
-			this.setCursor(this.cursors.pointerOver);
+			this.setCursor(this.getPointerOverFeatureCursor());
 		}
 
 		// Select feature
 		this.selected = [featureId];
 
-		this.store.updateProperty([
-			{ id: featureId, property: SELECT_PROPERTIES.SELECTED, value: true },
-		]);
+		this.mutateFeature.setSelected(featureId);
+
 		this.onSelect(featureId);
 
 		// Get the clicked feature
-		const { type, coordinates } = this.store.getGeometryCopy(featureId);
+		const { type, coordinates: featureCoordinates } =
+			this.readFeature.getGeometry(featureId);
 
 		if (type !== "LineString" && type !== "Polygon") {
 			return;
 		}
 
-		// LineString does not have nesting so we can just take 'coordinates'
-		// directly. Polygon is nested so we need to take [0] item in the array
-		const selectedCoords: Position[] =
-			type === "LineString" ? coordinates : coordinates[0];
-
-		if (selectedCoords && modeFlags && modeFlags.feature.coordinates) {
-			this.selectionPoints.create(selectedCoords, type, featureId);
+		if (featureCoordinates && modeFlags && modeFlags.feature.coordinates) {
+			this.selectionPoints.create({
+				featureCoordinates,
+				featureId,
+			});
 
 			if (modeFlags.feature.coordinates.midpoints) {
-				this.midPoints.create(
-					selectedCoords,
+				this.midPoints.create({
+					featureCoordinates,
 					featureId,
-					this.coordinatePrecision,
-				);
+				});
 			}
 		}
 	}
 
 	private onLeftClick(event: TerraDrawMouseEvent) {
-		const { clickedFeature, clickedMidPoint } = this.featuresAtMouseEvent.find(
+		const { clickedFeature } = this.featuresAtMouseEvent.find(
 			event,
 			this.selected.length > 0,
 		);
 
-		if (this.selected.length && clickedMidPoint) {
-			// TODO: We probably want to make sure the midpoint
-			// is visible?
+		const midPointClicked = this.midPoints.getNearestMidPoint(event);
 
-			this.midPoints.insert(
-				this.selected[0],
-				clickedMidPoint.id as string,
-				this.coordinatePrecision,
-			);
+		const selectedId = this.selected[0];
 
-			return;
+		if (selectedId) {
+			const { featureFlags } = this.getSelectedFlags(selectedId);
+
+			if (featureFlags?.coordinates?.midpoints && midPointClicked) {
+				// If coordinates are draggable we want to check if the click is closer to a coordinate than the midpoint,
+				// if it is we don't want to trigger the midpoint drag
+				if (featureFlags.coordinates.draggable) {
+					const closestMidPointDistance = this.pixelDistance.measure(
+						event,
+						this.readFeature.getGeometry<Point>(midPointClicked).coordinates,
+					);
+					const { dist: dragCoordinateDistance } =
+						this.dragCoordinate.getDraggable(event, selectedId);
+
+					if (
+						dragCoordinateDistance !== undefined &&
+						closestMidPointDistance > dragCoordinateDistance
+					) {
+						return;
+					}
+				}
+
+				this.midPoints.insert({
+					featureId: selectedId,
+					midPointId: midPointClicked as FeatureId,
+				});
+
+				this.onFinish(this.selected[0], {
+					action: FinishActions.InsertMidpoint,
+					mode: this.mode,
+				});
+
+				return;
+			}
 		}
 
-		if (clickedFeature && clickedFeature.id) {
-			this.select(clickedFeature.id, true);
+		if (clickedFeature?.id) {
+			if (this.allowManualSelection) {
+				this.select(clickedFeature.id, true);
+			}
 		} else if (this.selected.length && this.allowManualDeselection) {
-			this.deselect();
+			this.deselect(this.selected[0]);
 			return;
 		}
 	}
@@ -646,7 +797,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 	/** @internal */
 	cleanUp() {
 		if (this.selected.length) {
-			this.deselect();
+			this.deselect(this.selected[0]);
 		}
 	}
 
@@ -661,82 +812,95 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 
 		// We only need to stop the map dragging if
 		// we actually have something selected
-		if (!this.selected.length) {
+		const selectedId = this.selected[0];
+		if (!selectedId) {
 			return;
 		}
 
 		// If the selected feature is not draggable
 		// don't do anything
-		const properties = this.store.getPropertiesCopy(this.selected[0]);
-		const modeFlags = this.flags[properties.mode as string];
-		const draggable =
-			modeFlags &&
-			modeFlags.feature &&
-			(modeFlags.feature.draggable ||
-				(modeFlags.feature.coordinates &&
-					modeFlags.feature.coordinates.draggable) ||
-				(modeFlags.feature.coordinates &&
-					modeFlags.feature.coordinates.resizable) ||
-				(modeFlags.feature.coordinates &&
-					typeof modeFlags.feature.coordinates.midpoints === "object" &&
-					modeFlags.feature.coordinates.midpoints.draggable));
+		const { featureFlags, coordinatesFlags, hasDraggableFlags } =
+			this.getSelectedFlags(selectedId);
 
-		if (!draggable) {
+		if (!hasDraggableFlags) {
 			return;
 		}
 
 		this.dragEventCount = 0;
 
-		const selectedId = this.selected[0];
-		const draggableCoordinateIndex = this.dragCoordinate.getDraggableIndex(
-			event,
-			selectedId,
-		);
+		const pointerOverTarget =
+			this.dragTarget.type !== "none" &&
+			this.dragTarget.featureId === selectedId
+				? this.dragTarget
+				: { type: "none" as const };
 
-		// Drag Coordinate
-		if (
-			modeFlags &&
-			modeFlags.feature &&
-			modeFlags.feature.coordinates &&
-			(modeFlags.feature.coordinates.draggable ||
-				modeFlags.feature.coordinates.resizable) &&
-			draggableCoordinateIndex !== -1
-		) {
+		const draggableCoordinateIndex =
+			pointerOverTarget.type === "coordinate"
+				? pointerOverTarget.coordinateIndex
+				: this.dragCoordinate.getDraggableIndex(event, selectedId);
+
+		const resizableCoordinateIndex =
+			pointerOverTarget.type === "resize"
+				? pointerOverTarget.coordinateIndex
+				: this.dragCoordinateResizeFeature.getDraggableIndex(event, selectedId);
+
+		const resizableCoordinate =
+			coordinatesFlags?.resizable && resizableCoordinateIndex !== -1;
+
+		const draggableCoordinate =
+			coordinatesFlags?.draggable && draggableCoordinateIndex !== -1;
+
+		const draggableMidPoint =
+			coordinatesFlags &&
+			typeof coordinatesFlags.midpoints === "object" &&
+			coordinatesFlags.midpoints.draggable;
+
+		const draggableFeature =
+			featureFlags?.draggable &&
+			(pointerOverTarget.type === "feature" ||
+				this.dragFeature.canDrag(event, selectedId));
+
+		// Resize Coordinate
+		if (resizableCoordinate) {
 			this.setCursor(this.cursors.dragStart);
 
-			// With resizable
-			if (modeFlags.feature.coordinates.resizable) {
-				this.dragCoordinateResizeFeature.startDragging(
-					selectedId,
-					draggableCoordinateIndex,
-				);
-			} else {
-				// Without with resizable being set
-				this.dragCoordinate.startDragging(selectedId, draggableCoordinateIndex);
-			}
+			this.dragCoordinateResizeFeature.startDragging(
+				selectedId,
+				resizableCoordinateIndex,
+			);
+
+			setMapDraggability(false);
+			return;
+		}
+
+		// Drag Coordinate
+		if (draggableCoordinate) {
+			this.setCursor(this.cursors.dragStart);
+
+			this.dragCoordinate.startDragging(selectedId, draggableCoordinateIndex);
 
 			setMapDraggability(false);
 			return;
 		}
 
 		// Dragging Midpoint
-		if (
-			modeFlags &&
-			modeFlags.feature &&
-			modeFlags.feature.coordinates &&
-			typeof modeFlags.feature.coordinates.midpoints === "object" &&
-			modeFlags.feature.coordinates.midpoints.draggable
-		) {
-			const { clickedMidPoint: draggedMidPoint } =
-				this.featuresAtMouseEvent.find(event, this.selected.length > 0);
+		if (draggableMidPoint) {
+			const draggedMidPointId =
+				pointerOverTarget.type === "midpoint"
+					? pointerOverTarget.midPointId
+					: this.midPoints.getNearestMidPoint(event);
 
-			if (this.selected.length && draggedMidPoint) {
+			if (this.selected.length && draggedMidPointId) {
 				// We insert the midpoint first
-				this.midPoints.insert(
-					selectedId,
-					draggedMidPoint.id as string,
-					this.coordinatePrecision,
-				);
+				this.midPoints.insert({
+					featureId: selectedId,
+					midPointId: draggedMidPointId,
+				});
+
+				this.onFinish(this.selected[0], {
+					action: FinishActions.InsertMidpoint,
+					mode: this.mode,
+				});
 
 				const draggableCoordinateIndexAfterInsert =
 					this.dragCoordinate.getDraggableIndex(event, selectedId);
@@ -753,17 +917,14 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		}
 
 		// Drag Feature
-		if (
-			modeFlags &&
-			modeFlags.feature &&
-			modeFlags.feature.draggable &&
-			this.dragFeature.canDrag(event, selectedId)
-		) {
+		if (draggableFeature) {
 			this.setCursor(this.cursors.dragStart);
 			this.dragFeature.startDragging(event, selectedId);
 			setMapDraggability(false);
 			return;
 		}
+
+		this.setCursor("unset");
 	}
 
 	/** @internal */
@@ -782,7 +943,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			return;
 		}
 
-		const properties = this.store.getPropertiesCopy(selectedId);
+		const properties = this.readFeature.getProperties(selectedId);
 		const modeFlags = this.flags[properties.mode as string];
 		const canSelfIntersect: boolean =
 			(modeFlags &&
@@ -798,8 +959,6 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			return;
 		}
 
-		const validation = this.validations[properties.mode as string];
-
 		// Check if should rotate
 		if (
 			modeFlags &&
@@ -808,7 +967,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.canRotate(event)
 		) {
 			setMapDraggability(false);
-			this.rotateFeature.rotate(event, selectedId, validation);
+			this.rotateFeature.rotate(event, selectedId);
 			return;
 		}
 
@@ -821,7 +980,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		) {
 			setMapDraggability(false);
 
-			this.scaleFeature.scale(event, selectedId, validation);
+			this.scaleFeature.scale(event, selectedId);
 			return;
 		}
 
@@ -841,7 +1000,6 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			this.dragCoordinateResizeFeature.drag(
 				event,
 				modeFlags.feature.coordinates.resizable,
-				validation,
 			);
 			return;
 		}
@@ -857,18 +1015,13 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 				snapOptions = snappable;
 			}
 
-			this.dragCoordinate.drag(
-				event,
-				canSelfIntersect,
-				validation,
-				snapOptions,
-			);
+			this.dragCoordinate.drag(event, canSelfIntersect, snapOptions);
 			return;
 		}
 
 		// Check if feature is draggable and is dragged
 		if (this.dragFeature.isDragging()) {
-			this.dragFeature.drag(event, validation);
+			this.dragFeature.drag(event);
 			return;
 		}
 
@@ -891,17 +1044,17 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 		if (this.dragCoordinate.isDragging()) {
 			this.onFinish(this.selected[0], {
 				mode: this.mode,
-				action: "dragCoordinate",
+				action: FinishActions.DragCoordinate,
 			});
 		} else if (this.dragFeature.isDragging()) {
 			this.onFinish(this.selected[0], {
 				mode: this.mode,
-				action: "dragFeature",
+				action: FinishActions.DragFeature,
 			});
 		} else if (this.dragCoordinateResizeFeature.isDragging()) {
 			this.onFinish(this.selected[0], {
 				mode: this.mode,
-				action: "dragCoordinateResize",
+				action: FinishActions.DragCoordinateResize,
 			});
 		}
 
@@ -915,66 +1068,96 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 
 	/** @internal */
 	onMouseMove(event: TerraDrawMouseEvent) {
-		if (!this.selected.length) {
-			this.setCursor("unset");
+		const selectedId = this.selected[0];
+		if (!selectedId) {
+			this.clearDragTargetAndCursor();
 			return;
 		}
 
-		if (this.dragFeature.isDragging()) {
+		if (
+			this.dragFeature.isDragging() ||
+			this.dragCoordinate.isDragging() ||
+			this.dragCoordinateResizeFeature.isDragging()
+		) {
 			return;
 		}
 
-		let nearbyMidPoint = false;
-		this.midPoints.ids.forEach((id: string) => {
+		const { featureFlags } = this.getSelectedFlags(selectedId);
+		if (!featureFlags) {
+			this.clearDragTargetAndCursor();
+			return;
+		}
+
+		let nearbyMidPoint: FeatureId | undefined = undefined;
+		const coordinatesFlags = featureFlags.coordinates;
+
+		if (coordinatesFlags?.midpoints) {
+			nearbyMidPoint = this.midPoints.getNearestMidPoint(event);
+			if (nearbyMidPoint) {
+				this.dragTarget = {
+					type: "midpoint",
+					featureId: selectedId,
+					midPointId: nearbyMidPoint,
+				};
+				this.setCursor(this.cursors.insertMidpoint);
+				// We don't return here because we want to check if a coordinate or resize handle is closer.
+				// If it is, we want to give priority to dragging that target over inserting a midpoint.
+			}
+		}
+
+		if (coordinatesFlags && coordinatesFlags.draggable) {
+			const { index, dist: closestDraggableCoordinateDistance } =
+				this.dragCoordinate.getDraggable(event, selectedId);
+
+			if (index > -1) {
+				if (nearbyMidPoint) {
+					const closestMidPointDistance = this.pixelDistance.measure(
+						event,
+						this.readFeature.getGeometry<Point>(nearbyMidPoint).coordinates,
+					);
+					if (closestMidPointDistance < closestDraggableCoordinateDistance) {
+						return;
+					}
+				}
+
+				this.dragTarget = {
+					type: "coordinate",
+					featureId: selectedId,
+					coordinateIndex: index,
+				};
+				this.setCursor(this.getPointerOverCoordinateCursor());
+				return;
+			}
+		}
+
+		if (coordinatesFlags && coordinatesFlags.resizable) {
+			const index = this.dragCoordinateResizeFeature.getDraggableIndex(
+				event,
+				selectedId,
+			);
+			if (index > -1) {
+				this.dragTarget = {
+					type: "resize",
+					featureId: selectedId,
+					coordinateIndex: index,
+				};
+				this.setCursor(this.getPointerOverResizeHandleCursor());
+				return;
+			}
+		}
+
+		if (featureFlags.draggable && this.dragFeature.canDrag(event, selectedId)) {
 			if (nearbyMidPoint) {
 				return;
 			}
-			const geometry = this.store.getGeometryCopy<Point>(id);
-			const distance = this.pixelDistance.measure(event, geometry.coordinates);
 
-			if (distance < this.pointerDistance / 2) {
-				nearbyMidPoint = true;
-			}
-		});
-
-		let nearbySelectionPoint = false;
-		// TODO: Is there a cleaner way to handle prioritising
-		// dragging selection points?
-		this.selectionPoints.ids.forEach((id: FeatureId) => {
-			const geometry = this.store.getGeometryCopy<Point>(id);
-			const distance = this.pixelDistance.measure(event, geometry.coordinates);
-			if (distance < this.pointerDistance / 2) {
-				nearbyMidPoint = false;
-				nearbySelectionPoint = true;
-			}
-		});
-
-		if (nearbyMidPoint) {
-			this.setCursor(this.cursors.insertMidpoint);
+			this.dragTarget = { type: "feature", featureId: selectedId };
+			this.setCursor(this.getPointerOverFeatureCursor());
 			return;
 		}
 
-		// If we have a feature under the pointer then show the pointer over cursor
-		const { clickedFeature: featureUnderPointer } =
-			this.featuresAtMouseEvent.find(event, true);
-
-		if (
-			featureUnderPointer?.geometry.type !== "Point" &&
-			nearbySelectionPoint
-		) {
-			this.setCursor(this.cursors.pointerOverSelectionPoint);
-			return;
-		}
-
-		if (
-			this.selected.length > 0 &&
-			((featureUnderPointer && featureUnderPointer.id === this.selected[0]) ||
-				nearbySelectionPoint)
-		) {
-			this.setCursor(this.cursors.pointerOver);
-		} else {
-			// Set it back to whatever the default cursor is
-			this.setCursor("unset");
+		if (!nearbyMidPoint) {
+			this.clearDragTargetAndCursor();
 		}
 	}
 
@@ -986,10 +1169,16 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			feature.properties.mode === this.mode &&
 			feature.geometry.type === "Point"
 		) {
-			if (feature.properties.selectionPoint) {
+			if (feature.properties[SELECT_PROPERTIES.SELECTION_POINT]) {
 				styles.pointColor = this.getHexColorStylingValue(
 					this.styles.selectionPointColor,
 					styles.pointColor,
+					feature,
+				);
+
+				styles.pointOpacity = this.getNumericStylingValue(
+					this.styles.selectionPointOpacity,
+					1,
 					feature,
 				);
 
@@ -1002,6 +1191,12 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 				styles.pointWidth = this.getNumericStylingValue(
 					this.styles.selectionPointWidth,
 					styles.pointWidth,
+					feature,
+				);
+
+				styles.pointOutlineOpacity = this.getNumericStylingValue(
+					this.styles.selectionPointOutlineOpacity,
+					1,
 					feature,
 				);
 
@@ -1020,10 +1215,16 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 				return styles;
 			}
 
-			if (feature.properties.midPoint) {
+			if (feature.properties[SELECT_PROPERTIES.MID_POINT]) {
 				styles.pointColor = this.getHexColorStylingValue(
 					this.styles.midPointColor,
 					styles.pointColor,
+					feature,
+				);
+
+				styles.pointOpacity = this.getNumericStylingValue(
+					this.styles.midPointOpacity,
+					1,
 					feature,
 				);
 
@@ -1036,6 +1237,12 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 				styles.pointWidth = this.getNumericStylingValue(
 					this.styles.midPointWidth,
 					4,
+					feature,
+				);
+
+				styles.pointOutlineOpacity = this.getNumericStylingValue(
+					this.styles.midPointOutlineOpacity,
+					1,
 					feature,
 				);
 
@@ -1057,7 +1264,27 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 			// Select mode shortcuts the styling of a feature if it is selected
 			// A selected feature from another mode will end up in this block
 
-			if (feature.geometry.type === "Polygon") {
+			if (
+				feature.geometry.type === "Point" &&
+				feature.properties[COMMON_PROPERTIES.MARKER]
+			) {
+				styles.markerUrl = this.getUrlStylingValue(
+					this.styles.selectedMarkerUrl,
+					MARKER_URL_DEFAULT,
+					feature,
+				);
+				styles.markerHeight = this.getNumericStylingValue(
+					this.styles.selectedMarkerHeight,
+					40,
+					feature,
+				);
+				styles.markerWidth = this.getNumericStylingValue(
+					this.styles.selectedMarkerWidth,
+					32,
+					feature,
+				);
+				return styles;
+			} else if (feature.geometry.type === "Polygon") {
 				styles.polygonFillColor = this.getHexColorStylingValue(
 					this.styles.selectedPolygonColor,
 					styles.polygonFillColor,
@@ -1073,6 +1300,12 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 				styles.polygonOutlineColor = this.getHexColorStylingValue(
 					this.styles.selectedPolygonOutlineColor,
 					styles.polygonOutlineColor,
+					feature,
+				);
+
+				styles.polygonOutlineOpacity = this.getNumericStylingValue(
+					this.styles.selectedPolygonOutlineOpacity,
+					1,
 					feature,
 				);
 
@@ -1120,9 +1353,21 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 					feature,
 				);
 
+				styles.pointOpacity = this.getNumericStylingValue(
+					this.styles.selectedPointOpacity,
+					1,
+					feature,
+				);
+
 				styles.pointOutlineColor = this.getHexColorStylingValue(
 					this.styles.selectedPointOutlineColor,
 					styles.pointOutlineColor,
+					feature,
+				);
+
+				styles.pointOutlineOpacity = this.getNumericStylingValue(
+					this.styles.selectedPointOutlineOpacity,
+					1,
 					feature,
 				);
 
@@ -1154,33 +1399,28 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 				return;
 			}
 
-			const type = feature.geometry.type as "Polygon" | "LineString";
+			const type = feature.geometry.type;
 			const id = feature.id as FeatureId;
 
 			this.selectionPoints.delete();
 			this.midPoints.delete();
 
-			let coordinates: Position[] | undefined;
-			if (type === "Polygon") {
-				// For Polygon we need to take the first item in the coordinates array
-				coordinates = feature.geometry.coordinates[0] as Position[];
-			} else if (type === "LineString") {
-				// For LineString we can take the coordinates directly
-				coordinates = feature.geometry.coordinates as Position[];
-			} else {
+			if (type !== "LineString" && type !== "Polygon") {
 				return;
 			}
 
-			this.selectionPoints.create(coordinates, type, id);
+			const featureCoordinates = feature.geometry.coordinates;
+
+			this.selectionPoints.create({
+				featureCoordinates,
+				featureId: id,
+			});
 
 			if (flags?.feature?.coordinates?.midpoints) {
-				this.midPoints.create(
-					(type === "Polygon"
-						? feature.geometry.coordinates[0]
-						: feature.geometry.coordinates) as Position[],
-					id,
-					this.coordinatePrecision,
-				);
+				this.midPoints.create({
+					featureCoordinates,
+					featureId: id,
+				});
 			}
 		}
 	}

@@ -17,8 +17,9 @@ import {
 	OnFinishContext,
 	COMMON_PROPERTIES,
 	TerraDrawGeoJSONStore,
-	OnChangeContext,
+	TerraDrawOnChangeContext,
 	Projection,
+	TerraDrawHandledEvents,
 } from "./common";
 import {
 	ModeTypes,
@@ -68,6 +69,26 @@ import { transformScaleWebMercatorCoordinates } from "./geometry/transform/scale
 import { limitPrecision } from "./geometry/limit-decimal-precision";
 import { isValidJSONValue } from "./store/valid-json";
 import { haversineDistanceKilometers } from "./geometry/measure/haversine-distance";
+import { TerraDrawMarkerMode } from "./modes/marker/marker.mode";
+import {
+	TerraDrawUndoRedoKeyboardShortcuts,
+	type TerraDrawUndoRedoKeyboardShortcutsInterface,
+} from "./undo-redo/keyboard-shortcuts";
+import {
+	TerraDrawModeUndoRedo,
+	type TerraDrawModeUndoRedoInterface,
+} from "./undo-redo/mode-undo-redo";
+import {
+	TerraDrawSessionUndoRedo,
+	TerraDrawSessionUndoRedoInterface,
+} from "./undo-redo/session-undo-redo";
+import { TerraDrawUndoRedoCoordinator } from "./undo-redo/undo-redo-coordinator";
+import type {
+	HistoryCause,
+	HistoryEvent,
+	StackType,
+	TerraDrawUndoRedoInterface,
+} from "./undo-redo/undo-redo-types";
 
 // Helper type to determine the instance type of a class
 type InstanceType<T extends new (...args: any[]) => any> = T extends new (
@@ -80,10 +101,11 @@ type FinishListener = (id: FeatureId, context: OnFinishContext) => void;
 type ChangeListener = (
 	ids: FeatureId[],
 	type: string,
-	context?: OnChangeContext,
+	context?: TerraDrawOnChangeContext,
 ) => void;
 type SelectListener = (id: FeatureId) => void;
-type DeselectListener = () => void;
+type DeselectListener = (id: FeatureId) => void;
+type HistoryChangeListener = (event: HistoryEvent) => void;
 
 interface TerraDrawEventListeners {
 	ready: () => void;
@@ -91,6 +113,7 @@ interface TerraDrawEventListeners {
 	change: ChangeListener;
 	select: SelectListener;
 	deselect: DeselectListener;
+	history: HistoryChangeListener;
 }
 
 type GetFeatureOptions = {
@@ -100,6 +123,7 @@ type GetFeatureOptions = {
 	ignoreCoordinatePoints?: boolean;
 	ignoreCurrentlyDrawing?: boolean;
 	ignoreClosingPoints?: boolean;
+	ignoreSnappingPoints?: boolean;
 	addClosestCoordinateInfoToProperties?: boolean;
 };
 
@@ -119,18 +143,42 @@ class TerraDraw {
 		finish: FinishListener[];
 		select: SelectListener[];
 		deselect: DeselectListener[];
+		history: HistoryChangeListener[];
 	};
-	// This is the select mode that is assigned in the instance.
-	// There can only be 1 select mode active per instance
-	private _instanceSelectMode: undefined | string;
+	private _instanceSelectModes: string[];
+	private sessionUndoRedoEnabled = false;
+	private keyboardShortcutsMatcher?: TerraDrawUndoRedoKeyboardShortcutsInterface;
+	private drawingUndoRedo?: TerraDrawModeUndoRedoInterface;
+	private sessionUndoRedo?: TerraDrawSessionUndoRedoInterface;
+	private undoRedoCoordinator?: TerraDrawUndoRedoCoordinator;
 
 	constructor(options: {
 		adapter: TerraDrawAdapter;
 		modes: TerraDrawBaseDrawMode<any>[];
 		idStrategy?: IdStrategy<FeatureId>;
 		tracked?: boolean;
+		undoRedo?: {
+			modeLevel?: TerraDrawModeUndoRedoInterface;
+			sessionLevel?: TerraDrawSessionUndoRedoInterface;
+			keyboardShortcuts?: TerraDrawUndoRedoKeyboardShortcutsInterface;
+		};
 	}) {
 		this._adapter = options.adapter;
+		this._instanceSelectModes = [];
+
+		// Undo/Redo options
+		const modeLevelUndoRedo = options?.undoRedo?.modeLevel;
+		if (modeLevelUndoRedo) {
+			this.drawingUndoRedo = modeLevelUndoRedo;
+		}
+
+		const keyboardShortcutsMatcher = options?.undoRedo?.keyboardShortcuts;
+		if (keyboardShortcutsMatcher) {
+			this.keyboardShortcutsMatcher = keyboardShortcutsMatcher;
+		}
+
+		this.sessionUndoRedoEnabled = Boolean(options?.undoRedo?.sessionLevel);
+		const sessionLevelUndoRedo = options?.undoRedo?.sessionLevel;
 
 		this._mode = new TerraDrawStaticMode();
 
@@ -157,16 +205,13 @@ class TerraDraw {
 			throw new Error("No modes provided");
 		}
 
-		// Ensure only one select mode can be present
+		// Track the select modes in the order they are provided
 		modeKeys.forEach((mode) => {
 			if (modesMap[mode].type !== ModeTypes.Select) {
 				return;
 			}
-			if (this._instanceSelectMode) {
-				throw new Error("only one type of select mode can be provided");
-			} else {
-				this._instanceSelectMode = mode;
-			}
+
+			this._instanceSelectModes.push(mode);
 		});
 
 		this._modes = { ...modesMap, static: this._mode };
@@ -176,8 +221,12 @@ class TerraDraw {
 			deselect: [],
 			finish: [],
 			ready: [],
+			history: [],
 		};
-		this._store = new GeoJSONStore<OnChangeContext | undefined, FeatureId>({
+		this._store = new GeoJSONStore<
+			TerraDrawOnChangeContext | undefined,
+			FeatureId
+		>({
 			tracked: options.tracked ? true : false,
 			idStrategy: options.idStrategy ? options.idStrategy : undefined,
 		});
@@ -210,9 +259,11 @@ class TerraDraw {
 			this._eventListeners.finish.forEach((listener) => {
 				listener(finishedId, context);
 			});
+
+			this.emitHistoryChangeAfterFinish();
 		};
 
-		const onChange: StoreChangeHandler<OnChangeContext | undefined> = (
+		const onChange: StoreChangeHandler<TerraDrawOnChangeContext | undefined> = (
 			ids,
 			event,
 			context,
@@ -224,6 +275,8 @@ class TerraDraw {
 			this._eventListeners.change.forEach((listener) => {
 				listener(ids, event, context);
 			});
+
+			this.emitDrawingPushIfHistoryChangedFromLastSnapshot();
 
 			const { changed, unchanged } = getChanged(ids);
 
@@ -283,7 +336,7 @@ class TerraDraw {
 			}
 
 			this._eventListeners.deselect.forEach((listener) => {
-				listener();
+				listener(deselectedId);
 			});
 
 			const { changed, unchanged } = getChanged([deselectedId]);
@@ -320,7 +373,57 @@ class TerraDraw {
 				onDeselect: onDeselect,
 				onFinish: onFinish,
 				coordinatePrecision: this._adapter.getCoordinatePrecision(),
+				undoRedoMaxStackSize: this.drawingUndoRedo?.getMaxStackSize?.(),
 			});
+		});
+
+		if (this.sessionUndoRedoEnabled && sessionLevelUndoRedo) {
+			this.sessionUndoRedo = sessionLevelUndoRedo;
+			sessionLevelUndoRedo.register({
+				draw: this,
+				onHistoryChange: (historyChange) => {
+					this.undoRedoCoordinator?.emitStackHistoryChange(historyChange);
+				},
+			});
+		}
+
+		if (this.drawingUndoRedo) {
+			this.drawingUndoRedo.register({
+				getModeState: () => this.getModeState(),
+				getModeHistorySizes: () => this.getDrawingHistorySizes(),
+				undoMode: () => {
+					if (this._mode.undo) {
+						this._mode.undo();
+					}
+				},
+				redoMode: () => {
+					if (this._mode.redo) {
+						this._mode.redo();
+					}
+				},
+				clearModeHistory: () => {
+					const modeWithClearHistory = this._mode;
+
+					if (modeWithClearHistory.clearHistory) {
+						modeWithClearHistory.clearHistory();
+					}
+				},
+				onHistoryChange: (historyChange) => {
+					this.undoRedoCoordinator?.emitStackHistoryChange(historyChange);
+				},
+			});
+		}
+
+		this.undoRedoCoordinator = new TerraDrawUndoRedoCoordinator({
+			modeLevel: this.drawingUndoRedo,
+			sessionLevel: this.sessionUndoRedo,
+			shouldPreferMode: () => this.getModeState() === "drawing",
+			onHistoryChange: (historyChange) => {
+				this._eventListeners.history.forEach((listener) => {
+					listener(historyChange);
+				});
+			},
+			shouldEmitHistoryChange: () => this._enabled,
 		});
 	}
 
@@ -330,20 +433,104 @@ class TerraDraw {
 		}
 	}
 
+	private handleUndoRedoKeyboardShortcut(
+		event: TerraDrawKeyboardEvent,
+	): boolean {
+		if (!this.drawingUndoRedo && !this.sessionUndoRedoEnabled) {
+			return false;
+		}
+
+		if (!this.keyboardShortcutsMatcher) {
+			return false;
+		}
+
+		const isUndoShortcut =
+			this.keyboardShortcutsMatcher.isUndoKeyboardShortcut(event);
+		const isRedoShortcut =
+			this.keyboardShortcutsMatcher.isRedoKeyboardShortcut(event);
+
+		if (isUndoShortcut) {
+			if (!this.canUndo()) {
+				return false;
+			}
+
+			const didUndo = this.undo();
+			if (didUndo) {
+				event.preventDefault();
+			}
+			return didUndo;
+		}
+
+		if (isRedoShortcut) {
+			if (!this.canRedo()) {
+				return false;
+			}
+
+			const didRedo = this.redo();
+			if (didRedo) {
+				event.preventDefault();
+			}
+			return didRedo;
+		}
+
+		return false;
+	}
+
+	private getDrawingHistorySizes() {
+		const undoSize =
+			this._mode.undoSize && typeof this._mode.undoSize === "function"
+				? this._mode.undoSize()
+				: 0;
+
+		const redoSize =
+			this._mode.redoSize && typeof this._mode.redoSize === "function"
+				? this._mode.redoSize()
+				: 0;
+
+		return { undoSize, redoSize };
+	}
+
+	private emitDrawingPushIfHistoryChangedFromLastSnapshot() {
+		if (!this.drawingUndoRedo) {
+			return;
+		}
+
+		this.drawingUndoRedo.emitPushIfHistoryChangedFromLastSnapshot();
+	}
+
+	private emitDrawingPushIfHistoryChanged(before: {
+		undoSize: number;
+		redoSize: number;
+	}) {
+		if (!this.drawingUndoRedo) {
+			return;
+		}
+
+		this.drawingUndoRedo.emitPushIfHistoryChanged(before);
+	}
+
+	private emitHistoryChangeAfterFinish() {
+		this.undoRedoCoordinator?.emitPushAfterFinish();
+	}
+
 	private getModeStyles() {
 		const modeStyles: {
 			[key: string]: (feature: GeoJSONStoreFeatures) => TerraDrawAdapterStyling;
 		} = {};
 
+		const activeSelectMode = this._instanceSelectModes.includes(this._mode.mode)
+			? this._mode.mode
+			: undefined;
+
 		Object.keys(this._modes).forEach((mode) => {
 			modeStyles[mode] = (feature: GeoJSONStoreFeatures) => {
 				// If the feature is selected, we want to use the select mode styling
 				if (
-					this._instanceSelectMode &&
+					activeSelectMode &&
 					feature.properties[SELECT_PROPERTIES.SELECTED]
 				) {
-					return this._modes[this._instanceSelectMode].styleFeature.bind(
-						this._modes[this._instanceSelectMode],
+					return this._modes[activeSelectMode].styleFeature.bind(
+						this._modes[activeSelectMode],
 					)(feature);
 				}
 
@@ -389,6 +576,11 @@ class TerraDraw {
 				? options.ignoreClosingPoints
 				: false;
 
+		const ignoreSnappingPoints =
+			options && options.ignoreSnappingPoints !== undefined
+				? options.ignoreSnappingPoints
+				: false;
+
 		const unproject = this._adapter.unproject.bind(this._adapter);
 		const project = this._adapter.project.bind(this._adapter);
 
@@ -429,6 +621,13 @@ class TerraDraw {
 				if (
 					ignoreCurrentlyDrawing &&
 					feature.properties[COMMON_PROPERTIES.CURRENTLY_DRAWING]
+				) {
+					return false;
+				}
+
+				if (
+					ignoreSnappingPoints &&
+					feature.properties[COMMON_PROPERTIES.SNAPPING_POINT]
 				) {
 					return false;
 				}
@@ -499,8 +698,7 @@ class TerraDraw {
 
 				let coordinates;
 				if (feature.geometry.type === "Polygon") {
-					coordinates = feature.geometry.coordinates[0];
-					coordinates.pop(); // Remove duplicate end coordinate
+					coordinates = feature.geometry.coordinates[0].slice(0, -1); // Remove the closing coordinate as it's always the same as the first
 				} else if (feature.geometry.type === "LineString") {
 					coordinates = feature.geometry.coordinates;
 				} else {
@@ -537,39 +735,63 @@ class TerraDraw {
 			});
 	}
 
-	private getSelectModeOrThrow() {
-		const selectMode = this.getSelectMode({ switchToSelectMode: true });
+	private getSelectModeOrThrow(selectMode: string | undefined = undefined) {
+		const foundSelectMode = this.getSelectMode({
+			switchToSelectMode: true,
+			selectMode,
+		});
 
-		if (!selectMode) {
+		if (!foundSelectMode) {
 			throw new Error("No select mode defined in instance");
 		}
 
-		return selectMode;
+		return foundSelectMode;
 	}
 
 	private getSelectMode({
 		switchToSelectMode,
+		selectMode,
 	}: {
 		switchToSelectMode: boolean;
+		selectMode?: string;
 	}) {
 		this.checkEnabled();
+		const currentMode = this.getMode();
 
-		if (!this._instanceSelectMode) {
+		if (this._instanceSelectModes.length === 0) {
 			return null;
 		}
 
-		const currentMode = this.getMode();
-
-		// If we're not already in the select mode, we switch to it
-		if (switchToSelectMode && currentMode !== this._instanceSelectMode) {
-			this.setMode(this._instanceSelectMode);
+		if (
+			selectMode !== undefined &&
+			!this._instanceSelectModes.includes(selectMode)
+		) {
+			throw new Error(`No select mode with this name present: ${selectMode}`);
 		}
 
-		const selectMode = this._modes[
-			this._instanceSelectMode
-		] as TerraDrawBaseSelectMode<any>;
+		let modeToUse: string;
 
-		return selectMode;
+		// Explicit select mode provided, we use that
+		if (selectMode !== undefined) {
+			modeToUse = selectMode;
+		}
+		// No explicit select mode provided, but we are currently in a select mode, we use the current mode
+		else if (this._instanceSelectModes.includes(currentMode)) {
+			modeToUse = currentMode;
+		}
+		// Finally we default to the first select mode provided in the instance
+		else {
+			modeToUse = this._instanceSelectModes[0];
+		}
+
+		// If we're not already in the select mode, we switch to it
+		if (switchToSelectMode && currentMode !== modeToUse) {
+			this.setMode(modeToUse);
+		}
+
+		const mode = this._modes[modeToUse] as TerraDrawBaseSelectMode<any>;
+
+		return mode;
 	}
 
 	private isGuidanceFeature(feature: GeoJSONStoreFeatures): boolean {
@@ -613,7 +835,7 @@ class TerraDraw {
 	 */
 	updateModeOptions<Mode extends { new (...args: any[]): any }>(
 		mode: InstanceType<Mode>["mode"],
-		options: ConstructorParameters<Mode>[0],
+		options: Omit<NonNullable<ConstructorParameters<Mode>[0]>, "modeName">,
 	) {
 		this.checkEnabled();
 		if (!this._modes[mode]) {
@@ -628,7 +850,7 @@ class TerraDraw {
 	/**
 	 * Allows the user to get a snapshot (copy) of all given features
 	 *
-	 * @returns An array of all given Feature Geometries in the instances store
+	 * @returns An array of all given features in the instances store
 	 */
 	getSnapshot() {
 		// This is a read only method so we do not need to check if enabled
@@ -638,7 +860,7 @@ class TerraDraw {
 	/**
 	 * Allows the user to get a snapshot (copy) of a given feature by id
 	 *
-	 * @returns A copy of the feature geometry in the instances store
+	 * @returns A copy of the features in the instances store
 	 */
 	getSnapshotFeature(id: FeatureId) {
 		if (!this._store.has(id)) {
@@ -730,52 +952,80 @@ class TerraDraw {
 
 		const coordinatePointsToDelete: FeatureId[] = [];
 
+		const idsToDelete: FeatureId[] = [];
+
+		let modeToCleanUp: undefined | string = undefined;
+
 		ids.forEach((id) => {
 			// Deselect any passed features - this removes all selection points and midpoints
 			if (!this._store.has(id)) {
 				throw new Error(`No feature with id ${id}, can not delete`);
 			}
 
-			const feature = this._store.copy(id);
-			if (feature.properties[SELECT_PROPERTIES.SELECTED]) {
+			const properties = this._store.getPropertiesCopy(id);
+			if (properties[SELECT_PROPERTIES.SELECTED]) {
 				this.deselectFeature(id);
 			}
 
+			// Special case where the feature being deleted is currently being drawn
+			if (properties[COMMON_PROPERTIES.CURRENTLY_DRAWING]) {
+				if (this._modes[properties.mode as string]) {
+					modeToCleanUp = properties.mode as string;
+					return;
+				}
+			}
+
 			// If the feature has coordinate points, we want to remove them as well
-			if (feature.properties[COMMON_PROPERTIES.COORDINATE_POINT_IDS]) {
+			if (properties[COMMON_PROPERTIES.COORDINATE_POINT_IDS]) {
 				coordinatePointsToDelete.push(
-					...(feature.properties[
+					...(properties[
 						COMMON_PROPERTIES.COORDINATE_POINT_IDS
 					] as FeatureId[]),
 				);
 			}
+
+			idsToDelete.push(id);
 		});
 
-		this._store.delete([...ids, ...coordinatePointsToDelete], {
+		this._store.delete([...idsToDelete, ...coordinatePointsToDelete], {
 			origin: "api",
 		});
+
+		// Clean up should be safe to call without throwing errors
+		// as all internal modes wrap deletes in try catch blocks
+		if (
+			modeToCleanUp &&
+			this._modes[modeToCleanUp] &&
+			this._modes[modeToCleanUp].cleanUp()
+		) {
+			this._modes[modeToCleanUp].cleanUp();
+		}
 	}
 
 	/**
 	 * Provides the ability to programmatically select a feature using the instances provided select mode.
 	 * If not select mode is provided in the instance, an error will be thrown. If the instance is not currently
-	 * in the select mode, it will switch to it.
+	 * in a select mode, it will switch to the first select mode provided in the constructor unless
+	 * a select mode name is explicitly provided.
 	 * @param id - the id of the feature to select
+	 * @param selectMode - optional select mode name to use when selecting the feature
 	 */
-	selectFeature(id: FeatureId) {
-		const selectMode = this.getSelectModeOrThrow();
-		selectMode.selectFeature(id);
+	selectFeature(id: FeatureId, selectMode?: string) {
+		const selectModeInstance = this.getSelectModeOrThrow(selectMode);
+
+		selectModeInstance.selectFeature(id);
 	}
 
 	/**
 	 * Provides the ability to programmatically deselect a feature using the instances provided select mode.
 	 * If not select mode is provided in the instance, an error will be thrown. If the instance is not currently
-	 * in the select mode, it will switch to it.
+	 * in a select mode, it will switch to the first select mode provided in the constructor.
 	 * @param id  - the id of the feature to deselect
 	 */
 	deselectFeature(id: FeatureId) {
-		const selectMode = this.getSelectModeOrThrow();
-		selectMode.deselectFeature(id);
+		const selectModeInstance = this.getSelectModeOrThrow();
+
+		selectModeInstance.deselectFeature(id);
 	}
 
 	/**
@@ -1060,6 +1310,37 @@ class TerraDraw {
 		}
 	}
 
+	undo(): boolean {
+		this.checkEnabled();
+		return this.undoRedoCoordinator ? this.undoRedoCoordinator.undo() : false;
+	}
+
+	canUndo(): boolean {
+		this.checkEnabled();
+		return this.undoRedoCoordinator
+			? this.undoRedoCoordinator.canUndo()
+			: false;
+	}
+
+	canRedo(): boolean {
+		this.checkEnabled();
+		return this.undoRedoCoordinator
+			? this.undoRedoCoordinator.canRedo()
+			: false;
+	}
+
+	redo(): boolean {
+		this.checkEnabled();
+		return this.undoRedoCoordinator ? this.undoRedoCoordinator.redo() : false;
+	}
+
+	clearUndoRedoHistory() {
+		this.checkEnabled();
+		if (this.undoRedoCoordinator) {
+			this.undoRedoCoordinator.clearHistory();
+		}
+	}
+
 	/**
 	 * A method for adding features to the store. This method will validate the features
 	 * returning an array of validation results. Features must match one of the modes enabled
@@ -1148,16 +1429,28 @@ class TerraDraw {
 				return this._mode.state;
 			},
 			onClick: (event) => {
+				const drawingHistoryBeforeClick = this.drawingUndoRedo
+					? this.drawingUndoRedo.getHistorySizes()
+					: { undoSize: 0, redoSize: 0 };
 				this._mode.onClick(event);
+				this.emitDrawingPushIfHistoryChanged(drawingHistoryBeforeClick);
 			},
 			onMouseMove: (event) => {
 				this._mode.onMouseMove(event);
 			},
 			onKeyDown: (event) => {
+				if (this.handleUndoRedoKeyboardShortcut(event)) {
+					return;
+				}
+
 				this._mode.onKeyDown(event);
 			},
 			onKeyUp: (event) => {
+				const drawingHistoryBeforeKeyUp = this.drawingUndoRedo
+					? this.drawingUndoRedo.getHistorySizes()
+					: { undoSize: 0, redoSize: 0 };
 				this._mode.onKeyUp(event);
+				this.emitDrawingPushIfHistoryChanged(drawingHistoryBeforeKeyUp);
 			},
 			onDragStart: (event, setMapDraggability) => {
 				this._mode.onDragStart(event, setMapDraggability);
@@ -1174,7 +1467,7 @@ class TerraDraw {
 				this._mode.cleanUp();
 
 				// Remove all features from the store
-				this._store.clear();
+				this._store.clear({ origin: "api" });
 			},
 		});
 	}
@@ -1294,6 +1587,7 @@ export {
 	TerraDrawAngledRectangleMode,
 	TerraDrawSectorMode,
 	TerraDrawSensorMode,
+	TerraDrawMarkerMode,
 
 	// Types that are required for 3rd party developers to extend
 	TerraDrawExtend,
@@ -1308,6 +1602,7 @@ export {
 	type TerraDrawKeyboardEvent,
 
 	// TerraDrawBaseAdapter
+	type TerraDrawHandledEvents,
 	type TerraDrawChanges,
 	type TerraDrawStylingFunction,
 	type Project,
@@ -1320,4 +1615,13 @@ export {
 	ValidateMaxAreaSquareMeters,
 	ValidateNotSelfIntersecting,
 	ValidationReasons,
+
+	// Undo Redo
+	type TerraDrawUndoRedoInterface,
+	type TerraDrawModeUndoRedoInterface,
+	TerraDrawModeUndoRedo,
+	type TerraDrawUndoRedoKeyboardShortcutsInterface,
+	TerraDrawUndoRedoKeyboardShortcuts,
+	type TerraDrawSessionUndoRedoInterface,
+	TerraDrawSessionUndoRedo,
 };

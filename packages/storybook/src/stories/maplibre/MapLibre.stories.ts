@@ -1,14 +1,6 @@
 import { AllStories } from "../../common/stories";
 import { DefaultMeta } from "../../common/meta";
 import { SetupMapLibre } from "./setup";
-import { TerraDrawPolygonMode } from "../../../../terra-draw/src/terra-draw";
-import {
-	Story,
-	DefaultSize,
-	LocationNewYork,
-	DefaultZoom,
-	DefaultPlay,
-} from "../../common/config";
 
 const meta = {
 	...DefaultMeta,
@@ -19,20 +11,11 @@ const meta = {
 
 export default meta;
 
-// Polygon with coordinate points story
-export const PolygonWithChangeLayer: Story = {
-	args: {
-		id: "polygon-layer-change",
-		...DefaultSize,
-		...LocationNewYork,
-		...DefaultZoom,
-		modes: [() => new TerraDrawPolygonMode()],
-	},
-	...DefaultPlay,
-};
-
 // Ensure the names are set correctly for the stories
 export const Point = AllStories.Point;
+export const MarkerPNG = AllStories.MarkerPNG;
+export const MarkerJPG = AllStories.MarkerJPG;
+export const Opacity = AllStories.Opacity;
 export const Polygon = AllStories.Polygon;
 export const PolygonWithCoordinatePoints =
 	AllStories.PolygonWithCoordinatePoints;
@@ -45,21 +28,42 @@ export const PolygonWithCoordinateCounts =
 export const ZIndexOrdering = AllStories.ZIndexOrdering;
 export const Styling = AllStories.Styling;
 export const Circle = AllStories.Circle;
+export const CircleWithClickDragInteraction =
+	AllStories.CircleWithClickDragInteraction;
+export const CircleWithClickMoveOrDragInteraction =
+	AllStories.CircleWithClickMoveOrDragInteraction;
 export const Rectangle = AllStories.Rectangle;
+export const RectangleWithClickDragInteraction =
+	AllStories.RectangleWithClickDragInteraction;
+export const RectangleWithClickMoveOrDragInteraction =
+	AllStories.RectangleWithClickMoveOrDragInteraction;
 export const AngledRectangle = AllStories.AngledRectangle;
 export const Sector = AllStories.Sector;
 export const LineString = AllStories.LineString;
+export const LineStringFinishOnNthCoordinate =
+	AllStories.LineStringFinishOnNthCoordinate;
 export const LineStringWithCoordinateSnapping =
 	AllStories.LineStringWithCoordinateSnapping;
 export const LineStringWithLineSnapping = AllStories.LineStringWithLineSnapping;
 export const LineStringEditable = AllStories.LineStringEditable;
+export const LineStringWithCoordinatePoints =
+	AllStories.LineStringWithCoordinatePoints;
 export const FreehandLineString = AllStories.FreehandLineString;
 export const Freehand = AllStories.Freehand;
 export const FreehandWithAutoClose = AllStories.FreehandWithAutoClose;
+export const FreehandWithSmoothing = AllStories.FreehandWithSmoothing;
 export const Sensor = AllStories.Sensor;
 export const Select = AllStories.Select;
 export const SelectWithSelectionPoints = AllStories.SelectWithSelectionPoints;
 export const SelectWithMidPoints = AllStories.SelectWithMidPoints;
+export const SelectWithMultipleOfSameModes =
+	AllStories.SelectWithMultipleOfSameModes;
+export const SelectWithMultipleSelectModes =
+	AllStories.SelectWithMultipleSelectModes;
+export const SelectWithScaleAndRotate = AllStories.SelectWithScaleAndRotate;
+export const SelectWithResizable = AllStories.SelectWithResizable;
+export const SelectWithHoverCursors = AllStories.SelectWithHoverCursors;
 export const ProgrammaticRotate = AllStories.ProgrammaticRotate;
 export const ProgrammaticScale = AllStories.ProgrammaticScale;
 export const ProgrammaticUpdate = AllStories.ProgrammaticUpdate;
+export const UndoRedo = AllStories.UndoRedo;

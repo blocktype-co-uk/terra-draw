@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-leaflet-adapter@1.2.0...terra-draw-leaflet-adapter@1.3.0) (2026-05-07)
+
+
+### feat
+
+* **terra-draw-leaflet-adapter:** add initial support for dashed lines (#879) ([](https://github.com/JamesLMilner/terra-draw/commit/1e2232173439fe1b88504330487898355e70c3b3)), closes [#879](https://github.com/JamesLMilner/terra-draw/issues/879)
+
+## [1.2.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-leaflet-adapter@1.1.0...terra-draw-leaflet-adapter@1.2.0) (2026-02-01)
+
+
+### chore
+
+* **terra-draw-leaflet-adapter:** add support for polygon outline opacity (#800) ([](https://github.com/JamesLMilner/terra-draw/commit/305471f8e89b047e9da0baea82483bd1b9d4a79e)), closes [#800](https://github.com/JamesLMilner/terra-draw/issues/800)
+
+
+### feat
+
+* **terra-draw-leaflet-adapter:** add support for point and linestring opacity (#788) ([](https://github.com/JamesLMilner/terra-draw/commit/8bf7c721513d5d0635f935858c6120efd646be2f)), closes [#788](https://github.com/JamesLMilner/terra-draw/issues/788)
+
+## [1.1.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-leaflet-adapter@1.0.3...terra-draw-leaflet-adapter@1.1.0) (2025-10-12)
+
+
+### feat
+
+* **terra-draw-leaflet-adapter:** add support for markers (#673) ([](https://github.com/JamesLMilner/terra-draw/commit/d9c4377d1a2d6fef134132e9aa332073fa5a576c)), closes [#673](https://github.com/JamesLMilner/terra-draw/issues/673)
+
 ## [1.0.3](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-leaflet-adapter@1.0.2...terra-draw-leaflet-adapter@1.0.3) (2025-03-13)
 
 

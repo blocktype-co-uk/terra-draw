@@ -17,7 +17,10 @@ import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
 import Graphic from "@arcgis/core/Graphic";
 import SimpleMarkerSymbol from "@arcgis/core/symbols/SimpleMarkerSymbol";
 
-import { Symbol as ArcGISSymbol } from "@arcgis/core/symbols";
+import {
+	Symbol as ArcGISSymbol,
+	PictureMarkerSymbol,
+} from "@arcgis/core/symbols";
 import SimpleLineSymbol from "@arcgis/core/symbols/SimpleLineSymbol";
 import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol";
 import Color from "@arcgis/core/Color";
@@ -33,6 +36,7 @@ type InjectableArcGISMapsSDK = {
 	SimpleFillSymbol: typeof SimpleFillSymbol;
 	Graphic: typeof Graphic;
 	Color: typeof Color;
+	PictureMarkerSymbol: typeof PictureMarkerSymbol;
 };
 
 export class TerraDrawArcGISMapsSDKAdapter extends TerraDrawExtend.TerraDrawBaseAdapter {
@@ -207,6 +211,36 @@ export class TerraDrawArcGISMapsSDKAdapter extends TerraDrawExtend.TerraDrawBase
 		this._featureLayer.remove(feature);
 	}
 
+	private pxToArcGisPoints(value: number): number {
+		return Math.max(0.0001, value) * 0.75;
+	}
+
+	private toArcGisDashTemplate(
+		dash: [number, number] | undefined,
+	): [number, number] | null {
+		if (!dash) {
+			return null;
+		}
+
+		const [onPx, offPx] = dash;
+		if (
+			!Number.isFinite(onPx) ||
+			!Number.isFinite(offPx) ||
+			onPx < 0 ||
+			offPx < 0
+		) {
+			return null;
+		}
+
+		return [this.pxToArcGisPoints(onPx), this.pxToArcGisPoints(offPx)];
+	}
+
+	private toArcGisAlpha(opacity: number | undefined): number {
+		const normalized =
+			opacity === undefined ? 1 : Math.max(0, Math.min(1, opacity));
+		return Math.round(normalized * 255);
+	}
+
 	private addFeature(
 		feature: GeoJSONStoreFeatures,
 		styling: TerraDrawStylingFunction,
@@ -219,27 +253,111 @@ export class TerraDrawArcGISMapsSDKAdapter extends TerraDrawExtend.TerraDrawBase
 
 		switch (type) {
 			case "Point":
-				geometry = new this._lib.Point({
-					latitude: coordinates[1],
-					longitude: coordinates[0],
-				});
-				symbol = new this._lib.SimpleMarkerSymbol({
-					color: this.getColorFromHex(style.pointColor),
-					size: style.pointWidth * 2 + "px",
-					outline: {
-						color: this.getColorFromHex(style.pointOutlineColor),
-						width: style.pointOutlineWidth + "px",
-					},
-				});
+				if (style.markerUrl && style.markerHeight && style.markerWidth) {
+					geometry = new this._lib.Point({
+						latitude: coordinates[1],
+						longitude: coordinates[0],
+					});
+					symbol = new this._lib.PictureMarkerSymbol({
+						url: style.markerUrl,
+						width: style.markerWidth + "px",
+						height: style.markerHeight + "px",
+						xoffset: 0, // center horizontally
+						yoffset: ((style.markerHeight as number) ?? 0) / 2, // anchor bottom center
+					});
+				} else {
+					geometry = new this._lib.Point({
+						latitude: coordinates[1],
+						longitude: coordinates[0],
+					});
+					const pointOpacity = (style as { pointOpacity?: number })
+						.pointOpacity;
+					const pointOutlineOpacity = (
+						style as { pointOutlineOpacity?: number }
+					).pointOutlineOpacity;
+
+					symbol = new this._lib.SimpleMarkerSymbol({
+						color: this.getColorFromHex(
+							style.pointColor,
+							pointOpacity === undefined ? 1 : pointOpacity,
+						),
+						size: style.pointWidth * 2 + "px",
+						outline: {
+							color: this.getColorFromHex(
+								style.pointOutlineColor,
+								pointOutlineOpacity === undefined ? 1 : pointOutlineOpacity,
+							),
+							width: style.pointOutlineWidth + "px",
+						},
+					});
+				}
+
 				break;
 			case "LineString":
+				// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+				const lineStringOpacity = (style as { lineStringOpacity?: number })
+					.lineStringOpacity;
+				const lineColor = this.getColorFromHex(
+					style.lineStringColor,
+					lineStringOpacity === undefined ? 1 : lineStringOpacity,
+				);
+
 				geometry = new this._lib.Polyline({ paths: [coordinates] });
-				symbol = new this._lib.SimpleLineSymbol({
-					color: this.getColorFromHex(style.lineStringColor),
-					width: style.lineStringWidth + "px",
-				});
+
+				// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+				const lineStringDash = (
+					style as {
+						lineStringDash?: [number, number];
+					}
+				).lineStringDash;
+				const dashTemplate = this.toArcGisDashTemplate(lineStringDash);
+
+				if (dashTemplate) {
+					symbol = {
+						type: "cim",
+						data: {
+							type: "CIMSymbolReference",
+							symbol: {
+								type: "CIMLineSymbol",
+								symbolLayers: [
+									{
+										type: "CIMSolidStroke",
+										enable: true,
+										width: this.pxToArcGisPoints(style.lineStringWidth),
+										color: [
+											lineColor.r,
+											lineColor.g,
+											lineColor.b,
+											this.toArcGisAlpha(lineStringOpacity),
+										],
+										capStyle: "Butt",
+										joinStyle: "Round",
+										effects: [
+											{
+												type: "CIMGeometricEffectDashes",
+												dashTemplate,
+												lineDashEnding: "FullGap",
+												offsetAlongLine: 0,
+												// controlPointEnding: "NoConstraint"
+											},
+										],
+									},
+								],
+							},
+						},
+					} as any;
+				} else {
+					symbol = new this._lib.SimpleLineSymbol({
+						color: lineColor,
+						width: style.lineStringWidth + "px",
+					});
+				}
 				break;
 			case "Polygon":
+				const polygonOutlineOpacity = (
+					style as { polygonOutlineOpacity?: number }
+				).polygonOutlineOpacity;
+
 				geometry = new this._lib.Polygon({ rings: coordinates });
 				symbol = new this._lib.SimpleFillSymbol({
 					color: this.getColorFromHex(
@@ -247,7 +365,10 @@ export class TerraDrawArcGISMapsSDKAdapter extends TerraDrawExtend.TerraDrawBase
 						style.polygonFillOpacity,
 					),
 					outline: {
-						color: this.getColorFromHex(style.polygonOutlineColor),
+						color: this.getColorFromHex(
+							style.polygonOutlineColor,
+							polygonOutlineOpacity,
+						),
 						width: style.polygonOutlineWidth + "px",
 					},
 				});
@@ -270,7 +391,7 @@ export class TerraDrawArcGISMapsSDKAdapter extends TerraDrawExtend.TerraDrawBase
 
 	private getColorFromHex(hexColor: string, opacity?: number): Color {
 		const color = this._lib.Color.fromHex(hexColor);
-		if (opacity) {
+		if (opacity !== undefined) {
 			color.a = opacity;
 		}
 		return color;

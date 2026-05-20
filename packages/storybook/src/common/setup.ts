@@ -1,4 +1,7 @@
 import { TerraDrawBaseDrawMode } from "../../../terra-draw/src/extend";
+import { TerraDrawUndoRedoKeyboardShortcuts } from "../../../terra-draw/src/terra-draw";
+import { TerraDrawModeUndoRedo } from "../../../terra-draw/src/undo-redo/mode-undo-redo";
+import { TerraDrawSessionUndoRedo } from "../../../terra-draw/src/undo-redo/session-undo-redo";
 import { StoryArgs } from "./config";
 
 const COLORS = {
@@ -10,13 +13,14 @@ const COLORS = {
 	lightText: "#fff",
 };
 
-export function setupMapContainer(args: StoryArgs) {
+export function setupMapContainer(args: StoryArgs & { adapter: string }) {
 	const modes = args.modes.map((mode) => mode());
 
 	const modeButtons: HTMLButtonElement[] = [];
 
 	const container = document.createElement("div");
 
+	container.setAttribute("data-adapter", args.adapter);
 	container.setAttribute("data-testid", `container`);
 	container.style.display = "flex";
 	container.style.flexDirection = "column";
@@ -194,6 +198,28 @@ export function setupControls({
 	});
 }
 
-export function onNextFrame(fn: any) {
-	requestAnimationFrame(() => requestAnimationFrame(fn));
+export function whenElementExists(
+	selector: string,
+	cb: (el: HTMLElement) => void,
+) {
+	function check() {
+		const el = document.querySelector(selector);
+		if (el) {
+			cb(el as HTMLElement);
+		} else {
+			requestAnimationFrame(check);
+		}
+	}
+
+	check();
 }
+
+export const SetupUndoRedo = (args: StoryArgs) => {
+	return args.enableUndoRedo
+		? {
+				sessionLevel: new TerraDrawSessionUndoRedo({ maxStackSize: 100 }),
+				modeLevel: new TerraDrawModeUndoRedo({ maxStackSize: 100 }),
+				keyboardShortcuts: new TerraDrawUndoRedoKeyboardShortcuts(),
+			}
+		: undefined;
+};

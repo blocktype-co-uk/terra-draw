@@ -2,6 +2,89 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.6.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.5.0...terra-draw-google-maps-adapter@1.6.0) (2026-05-18)
+
+
+### feat
+
+* **terra-draw-google-maps-adapter:** provide an option to have an isolated data layer (#756) ([](https://github.com/JamesLMilner/terra-draw/commit/4d304f85e68f5e5639dcb093246ebfb1f871d8f8)), closes [#756](https://github.com/JamesLMilner/terra-draw/issues/756)
+
+## [1.5.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.4.1...terra-draw-google-maps-adapter@1.5.0) (2026-05-07)
+
+
+### feat
+
+* **terra-draw-google-maps-adapter:** add initial support for dashed lines (#880) ([](https://github.com/JamesLMilner/terra-draw/commit/edf98c8e996f57f90c9dcec09f7c58597e41dd86)), closes [#880](https://github.com/JamesLMilner/terra-draw/issues/880)
+
+## [1.4.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.4.0...terra-draw-google-maps-adapter@1.4.1) (2026-05-04)
+
+
+### fix
+
+* **terra-draw-google-maps-adapter:** fix event listeners not being removed on unregister (#874) ([](https://github.com/JamesLMilner/terra-draw/commit/62b1f98bf723b0393db70abcac04da3d35fc4870)), closes [#874](https://github.com/JamesLMilner/terra-draw/issues/874) [#873](https://github.com/JamesLMilner/terra-draw/issues/873)
+
+## [1.4.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.3.1...terra-draw-google-maps-adapter@1.4.0) (2026-05-03)
+
+
+### feat
+
+* **terra-draw-google-maps-adapter:** add property allow interactions on AdvancedMarkerElements (#871) ([](https://github.com/JamesLMilner/terra-draw/commit/73c7c5590649afd9f70a67d1d826cd7201abe7fd)), closes [#871](https://github.com/JamesLMilner/terra-draw/issues/871)
+
+## [1.3.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.3.0...terra-draw-google-maps-adapter@1.3.1) (2026-02-11)
+
+
+### fix
+
+* **terra-draw-google-maps-adapter:** set ids to strings to avoid incorrect rendering (#811) ([](https://github.com/JamesLMilner/terra-draw/commit/7135606dae4b80233f40fcceb884edabc6af0629)), closes [#811](https://github.com/JamesLMilner/terra-draw/issues/811)
+
+## [1.3.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.2.1...terra-draw-google-maps-adapter@1.3.0) (2026-02-01)
+
+
+### chore
+
+* **terra-draw-google-maps-adapter:** add support for polygon outline opacity (#795) ([](https://github.com/JamesLMilner/terra-draw/commit/f33d401127fe1e37da2b090e67e5d2379ad43424)), closes [#795](https://github.com/JamesLMilner/terra-draw/issues/795)
+
+
+### feat
+
+* **terra-draw-google-maps-adapter:** add support for point and linestring opacity (#787) ([](https://github.com/JamesLMilner/terra-draw/commit/3d8c0e8341be3f87a61afcf1012e806ebb519b5a)), closes [#787](https://github.com/JamesLMilner/terra-draw/issues/787)
+
+## [1.2.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.2.0...terra-draw-google-maps-adapter@1.2.1) (2026-01-02)
+
+
+### fix
+
+* **terra-draw-google-maps-adapter:** use rAF to fix issues with external geometries and improve perf (#764) ([](https://github.com/JamesLMilner/terra-draw/commit/6dd34829e2ea88b027dbb45354b43adce9f8cd0e)), closes [#764](https://github.com/JamesLMilner/terra-draw/issues/764)
+
+## [1.2.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.1.2...terra-draw-google-maps-adapter@1.2.0) (2026-01-02)
+
+
+### feat
+
+* **terra-draw-google-maps-adapter:** allow use of @googlemaps/js-api-loader v2 (#762) ([](https://github.com/JamesLMilner/terra-draw/commit/08438b8b901148f53782a5fae21455de500385d4)), closes [#762](https://github.com/JamesLMilner/terra-draw/issues/762)
+
+## [1.1.2](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.1.1...terra-draw-google-maps-adapter@1.1.2) (2025-12-02)
+
+
+### fix
+
+* **terra-draw-google-maps-adapter:** fix keyboard events not firing when map is focused (#734) ([](https://github.com/JamesLMilner/terra-draw/commit/6ad94fc1eaea7b5a9da1d5f893d9040e4237f50c)), closes [#734](https://github.com/JamesLMilner/terra-draw/issues/734)
+
+## [1.1.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.1.0...terra-draw-google-maps-adapter@1.1.1) (2025-11-30)
+
+
+### fix
+
+* **terra-draw-google-maps-adapter:** ensure coordinates are accurate in fullscreen mode (#726) ([](https://github.com/JamesLMilner/terra-draw/commit/7f7faf6a0e9b472eaf51be519975d974ccd3649c)), closes [#726](https://github.com/JamesLMilner/terra-draw/issues/726)
+* **terra-draw-google-maps-adapter:** solve data.setStyle teardown issues - #724 (#725) ([](https://github.com/JamesLMilner/terra-draw/commit/ccbf1cc32fc24c22f727edaf1e0639aedf658d00)), closes [#724](https://github.com/JamesLMilner/terra-draw/issues/724) [#725](https://github.com/JamesLMilner/terra-draw/issues/725)
+
+## [1.1.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.0.4...terra-draw-google-maps-adapter@1.1.0) (2025-10-12)
+
+
+### feat
+
+* **terra-draw-google-maps-adapter:** add marker support (#672) ([](https://github.com/JamesLMilner/terra-draw/commit/92ca10fa294fb21b148e4e630640b3ef2c239662)), closes [#672](https://github.com/JamesLMilner/terra-draw/issues/672)
+
 ## [1.0.4](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-google-maps-adapter@1.0.3...terra-draw-google-maps-adapter@1.0.4) (2025-09-17)
 
 

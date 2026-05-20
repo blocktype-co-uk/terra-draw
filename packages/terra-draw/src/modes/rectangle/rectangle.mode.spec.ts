@@ -1,4 +1,4 @@
-import { GeoJSONStore } from "../../store/store";
+import { GeoJSONStore, GeoJSONStoreFeatures } from "../../store/store";
 import { MockModeConfig } from "../../test/mock-mode-config";
 import { MockCursorEvent } from "../../test/mock-cursor-event";
 import { TerraDrawRectangleMode } from "./rectangle.mode";
@@ -38,6 +38,25 @@ describe("TerraDrawRectangleMode", () => {
 			new TerraDrawRectangleMode({
 				styles: { fillColor: "#ffffff" },
 				keyEvents: { cancel: null, finish: null },
+			});
+		});
+
+		it("constructs with custom mode name", () => {
+			const rectangleMode = new TerraDrawRectangleMode({ modeName: "custom" });
+			expect(rectangleMode.mode).toBe("custom");
+		});
+
+		it("constructs with drawInteraction option", () => {
+			new TerraDrawRectangleMode({
+				drawInteraction: "click-move",
+			});
+
+			new TerraDrawRectangleMode({
+				drawInteraction: "click-drag",
+			});
+
+			new TerraDrawRectangleMode({
+				drawInteraction: "click-move-or-drag",
 			});
 		});
 	});
@@ -130,7 +149,7 @@ describe("TerraDrawRectangleMode", () => {
 		});
 
 		describe("registered", () => {
-			beforeEach(() => {
+			it("adds a rectangle to store if registered", () => {
 				const mockConfig = MockModeConfig(rectangleMode.mode);
 
 				store = mockConfig.store;
@@ -139,8 +158,6 @@ describe("TerraDrawRectangleMode", () => {
 
 				rectangleMode.register(mockConfig);
 				rectangleMode.start();
-			});
-			it("adds a rectangle to store if registered", () => {
 				rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
 				expect(onChange).toHaveBeenCalledTimes(1);
@@ -149,39 +166,179 @@ describe("TerraDrawRectangleMode", () => {
 					"create",
 					undefined,
 				);
+				expect(onFinish).toHaveBeenCalledTimes(0);
 			});
 
-			it("finishes drawing rectangle on second click", () => {
-				rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			describe.each([
+				["click-move" as const, true],
+				["click-move-or-drag" as const, true],
+				["click-drag" as const, false],
+			])("with drawInteraction %s", (drawInteraction, shouldAddRectangle) => {
+				it(`${shouldAddRectangle ? "adds" : "does not add"} a rectangle to store`, () => {
+					rectangleMode = new TerraDrawRectangleMode({
+						drawInteraction,
+					});
+					const mockConfig = MockModeConfig(rectangleMode.mode);
 
-				let features = store.copyAll();
-				expect(features.length).toBe(1);
-				expect(
-					features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
-				).toBe(true);
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
 
-				rectangleMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
 
-				features = store.copyAll();
-				expect(features.length).toBe(1);
-				expect(
-					features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
-				).toBe(undefined);
+					rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-				expect(followsRightHandRule(features[0].geometry as Polygon)).toBe(
-					true,
-				);
+					expect(onChange).toHaveBeenCalledTimes(shouldAddRectangle ? 1 : 0);
+					if (shouldAddRectangle) {
+						expect(onChange).toHaveBeenCalledWith(
+							[expect.any(String)],
+							"create",
+							undefined,
+						);
+					}
 
-				expect(onChange).toHaveBeenCalledTimes(3);
-				expect(onChange).toHaveBeenCalledWith(
-					[expect.any(String)],
-					"create",
-					undefined,
-				);
-				expect(onFinish).toHaveBeenCalledTimes(1);
-				expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
-					action: "draw",
-					mode: "rectangle",
+					expect(onFinish).toHaveBeenCalledTimes(0);
+				});
+			});
+
+			describe.each([["click-move" as const], ["click-move-or-drag" as const]])(
+				"with drawInteraction %s",
+				(drawInteraction) => {
+					it("finishes drawing rectangle on second click", () => {
+						rectangleMode = new TerraDrawRectangleMode({
+							drawInteraction,
+						});
+						const mockConfig = MockModeConfig(rectangleMode.mode);
+
+						store = mockConfig.store;
+						onChange = mockConfig.onChange;
+						onFinish = mockConfig.onFinish;
+
+						rectangleMode.register(mockConfig);
+						rectangleMode.start();
+
+						rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+						let features = store.copyAll();
+						expect(features.length).toBe(1);
+						expect(
+							features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+						).toBe(true);
+
+						rectangleMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+
+						features = store.copyAll();
+						expect(features.length).toBe(1);
+						expect(
+							features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+						).toBe(undefined);
+
+						expect(followsRightHandRule(features[0].geometry as Polygon)).toBe(
+							true,
+						);
+
+						expect(onChange).toHaveBeenCalledTimes(3);
+						expect(onChange).toHaveBeenCalledWith(
+							[expect.any(String)],
+							"create",
+							undefined,
+						);
+						expect(onFinish).toHaveBeenCalledTimes(1);
+						expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
+							action: "draw",
+							mode: "rectangle",
+						});
+					});
+				},
+			);
+
+			describe("validate", () => {
+				let valid = false;
+
+				beforeEach(() => {
+					rectangleMode = new TerraDrawRectangleMode({
+						validation: () => ({ valid }),
+					});
+					const mockConfig = MockModeConfig(rectangleMode.mode);
+
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
+				});
+
+				it("does not finish drawing circle on second click if validation returns false", () => {
+					valid = false;
+
+					rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+					let features = store.copyAll();
+					expect(features.length).toBe(1);
+					const beforeGeometry = features[0].geometry;
+
+					rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+					features = store.copyAll();
+					expect(features.length).toBe(1);
+					const afterGeometry = features[0].geometry;
+
+					// The second click should not have changed the geometry
+					expect(afterGeometry).toStrictEqual(beforeGeometry);
+
+					// Create, but no properties changed
+					expect(onChange).toHaveBeenCalledTimes(1);
+					expect(onChange).toHaveBeenNthCalledWith(
+						1,
+						[expect.any(String)],
+						"create",
+						undefined,
+					);
+
+					// The second click should not have finished the drawing
+					expect(onFinish).toHaveBeenCalledTimes(0);
+				});
+
+				it("does finish drawing circle on second click if validation returns true with no cursor movement", () => {
+					valid = true;
+
+					rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+					let features = store.copyAll();
+					expect(features.length).toBe(1);
+
+					rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+					features = store.copyAll();
+					expect(features.length).toBe(1);
+
+					expect(onChange).toHaveBeenCalledTimes(3);
+					expect(onChange).toHaveBeenNthCalledWith(
+						1,
+						[expect.any(String)],
+						"create",
+						undefined,
+					);
+					expect(onChange).toHaveBeenNthCalledWith(
+						2,
+						[expect.any(String)],
+						"update",
+						{ target: "geometry" },
+					);
+					expect(onChange).toHaveBeenNthCalledWith(
+						3,
+						[expect.any(String)],
+						"update",
+						{ target: "properties" },
+					);
+
+					expect(onFinish).toHaveBeenCalledTimes(1);
+					expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
+						action: "draw",
+						mode: "rectangle",
+					});
 				});
 			});
 
@@ -229,22 +386,29 @@ describe("TerraDrawRectangleMode", () => {
 
 			rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-			let features = store.copyAll();
-			expect(features.length).toBe(1);
-			expect(features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING]).toBe(
-				true,
-			);
+			let [firstRectangle] = store.copyAll();
+			expect(firstRectangle).toBeDefined();
+			expect(
+				firstRectangle.properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+			).toBe(true);
 
 			rectangleMode.onKeyUp(MockKeyboardEvent({ key: "Enter" }));
 
+			expect(onFinish).toHaveBeenCalledTimes(1);
+
 			rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-			features = store.copyAll();
-			// Two as the rectangle has been closed via enter
+			const features = store.copyAll();
+
+			// Two features as the rectangle has been closed via enter
 			expect(features.length).toBe(2);
-			expect(features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING]).toBe(
-				undefined,
+			const finishedFeature = features.find(
+				(feature) => feature.id === firstRectangle.id,
 			);
+			expect(finishedFeature).toBeDefined();
+			expect(
+				finishedFeature!.properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+			).toBe(undefined);
 
 			// close calls onChange an extra time because of the right hand rule fixing
 			expect(onChange).toHaveBeenCalledTimes(4);
@@ -253,7 +417,6 @@ describe("TerraDrawRectangleMode", () => {
 				"create",
 				undefined,
 			);
-			expect(onFinish).toHaveBeenCalledTimes(1);
 		});
 
 		it("does not finish on key press when keyEvents null", () => {
@@ -324,7 +487,7 @@ describe("TerraDrawRectangleMode", () => {
 				2,
 				[expect.any(String)],
 				"update",
-				undefined,
+				{ target: "geometry" },
 			);
 
 			const updatedFeature = store.copyAll()[0];
@@ -377,6 +540,8 @@ describe("TerraDrawRectangleMode", () => {
 
 	describe("onKeyUp", () => {
 		let store: TerraDrawGeoJSONStore;
+		let onChange: jest.Mock;
+		let onFinish: jest.Mock;
 		let rectangleMode: TerraDrawRectangleMode;
 
 		beforeEach(() => {
@@ -385,6 +550,8 @@ describe("TerraDrawRectangleMode", () => {
 
 			const mockConfig = MockModeConfig(rectangleMode.mode);
 			store = mockConfig.store;
+			onChange = mockConfig.onChange;
+			onFinish = mockConfig.onFinish;
 			rectangleMode.register(mockConfig);
 			rectangleMode.start();
 		});
@@ -392,6 +559,10 @@ describe("TerraDrawRectangleMode", () => {
 		describe("cancel", () => {
 			it("does nothing when no rectangle is present", () => {
 				rectangleMode.onKeyUp(MockKeyboardEvent({ key: "Escape" }));
+				const features = store.copyAll();
+				expect(features.length).toBe(0);
+				expect(onChange).toHaveBeenCalledTimes(0);
+				expect(onFinish).toHaveBeenCalledTimes(0);
 			});
 
 			it("deletes the rectangle when currently editing", () => {
@@ -400,42 +571,446 @@ describe("TerraDrawRectangleMode", () => {
 				let features = store.copyAll();
 				expect(features.length).toBe(1);
 
+				// Clear previous onChange calls
+				onChange.mockClear();
+
 				rectangleMode.onKeyUp(MockKeyboardEvent({ key: "Escape" }));
 
 				features = store.copyAll();
 				expect(features.length).toBe(0);
+				expect(onChange).toHaveBeenCalledTimes(1);
+				expect(onChange).toHaveBeenNthCalledWith(
+					1,
+					[expect.any(String)],
+					"delete",
+					undefined,
+				);
+				expect(onFinish).toHaveBeenCalledTimes(0);
 			});
 		});
 	});
 
 	describe("onDrag", () => {
-		it("does nothing", () => {
-			const rectangleMode = new TerraDrawRectangleMode();
+		let onChange: jest.Mock;
+		let onFinish: jest.Mock;
+		let rectangleMode: TerraDrawRectangleMode;
+		let setMapDraggability: jest.Mock;
+		let store: TerraDrawGeoJSONStore;
 
-			expect(() => {
-				rectangleMode.onDrag();
-			}).not.toThrow();
+		beforeEach(() => {
+			setMapDraggability = jest.fn();
 		});
+
+		describe.each([
+			["without drawInteraction option", undefined],
+			["with drawInteraction click-move", "click-move" as const],
+		])("%s", (_, drawInteraction) => {
+			it("does nothing", () => {
+				rectangleMode = new TerraDrawRectangleMode(
+					drawInteraction ? { drawInteraction } : undefined,
+				);
+
+				const mockConfig = MockModeConfig(rectangleMode.mode);
+				store = mockConfig.store;
+				onChange = mockConfig.onChange;
+				onFinish = mockConfig.onFinish;
+				rectangleMode.register(mockConfig);
+				rectangleMode.start();
+
+				rectangleMode.onDrag(
+					MockCursorEvent({ lng: 0, lat: 0 }),
+					setMapDraggability,
+				);
+
+				expect(onFinish).toHaveBeenCalledTimes(0);
+				expect(onChange).toHaveBeenCalledTimes(0);
+				expect(setMapDraggability).toHaveBeenCalledTimes(0);
+			});
+		});
+
+		describe.each([["click-drag" as const], ["click-move-or-drag" as const]])(
+			"with drawInteraction %s and onDrag pointer event set to false",
+			(drawInteraction) => {
+				it("does nothing", () => {
+					const rectangleMode = new TerraDrawRectangleMode({
+						drawInteraction,
+						pointerEvents: {
+							...DefaultPointerEvents,
+							onDrag: false,
+						},
+					});
+
+					const mockConfig = MockModeConfig(rectangleMode.mode);
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
+
+					rectangleMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					onChange.mockClear();
+
+					rectangleMode.onDrag(
+						MockCursorEvent({ lng: 1, lat: 1 }),
+						setMapDraggability,
+					);
+
+					expect(onFinish).toHaveBeenCalledTimes(0);
+					expect(onChange).toHaveBeenCalledTimes(0);
+				});
+			},
+		);
+
+		it("with drawInteraction click-move-or-drag and drawType is click it does nothing", () => {
+			const rectangleMode = new TerraDrawRectangleMode({
+				drawInteraction: "click-move-or-drag",
+			});
+
+			const mockConfig = MockModeConfig(rectangleMode.mode);
+			store = mockConfig.store;
+			onChange = mockConfig.onChange;
+			onFinish = mockConfig.onFinish;
+			rectangleMode.register(mockConfig);
+			rectangleMode.start();
+
+			rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+			onChange.mockClear();
+			onFinish.mockClear();
+
+			rectangleMode.onDrag(
+				MockCursorEvent({ lng: 0, lat: 0 }),
+				setMapDraggability,
+			);
+
+			expect(onChange).toHaveBeenCalledTimes(0);
+			expect(onFinish).toHaveBeenCalledTimes(0);
+			expect(setMapDraggability).toHaveBeenCalledTimes(0);
+		});
+
+		describe.each([["click-drag" as const], ["click-move-or-drag" as const]])(
+			"with drawInteraction %s",
+			(drawInteraction) => {
+				it("updates the rectangle size", () => {
+					const rectangleMode = new TerraDrawRectangleMode({
+						drawInteraction,
+					});
+
+					const mockConfig = MockModeConfig(rectangleMode.mode);
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
+
+					rectangleMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					expect(onChange).toHaveBeenCalledTimes(1);
+					expect(onChange).toHaveBeenNthCalledWith(
+						1,
+						[expect.any(String)],
+						"create",
+						undefined,
+					);
+					expect(setMapDraggability).toHaveBeenCalledTimes(1);
+
+					const feature = store.copyAll()[0];
+
+					rectangleMode.onDrag(
+						MockCursorEvent({ lng: 1, lat: 1 }),
+						setMapDraggability,
+					);
+
+					expect(onChange).toHaveBeenCalledTimes(2);
+					expect(onChange).toHaveBeenNthCalledWith(
+						2,
+						[expect.any(String)],
+						"update",
+						{ target: "geometry" },
+					);
+
+					const updatedFeature = store.copyAll()[0];
+
+					expect(feature.id).toBe(updatedFeature.id);
+					expect(feature.geometry.coordinates).not.toStrictEqual(
+						updatedFeature.geometry.coordinates,
+					);
+
+					expect(followsRightHandRule(updatedFeature.geometry as Polygon)).toBe(
+						true,
+					);
+					expect(setMapDraggability).toHaveBeenCalledTimes(1);
+				});
+			},
+		);
 	});
 
 	describe("onDragStart", () => {
-		it("does nothing", () => {
-			const rectangleMode = new TerraDrawRectangleMode();
+		let onChange: jest.Mock;
+		let onFinish: jest.Mock;
+		let rectangleMode: TerraDrawRectangleMode;
+		let setMapDraggability: jest.Mock;
 
-			expect(() => {
-				rectangleMode.onDragStart();
-			}).not.toThrow();
+		beforeEach(() => {
+			setMapDraggability = jest.fn();
 		});
+
+		describe.each([
+			["without drawInteraction option", undefined],
+			["with drawInteraction click-move", "click-move" as const],
+		])("%s", (_, drawInteraction) => {
+			it("does nothing", () => {
+				rectangleMode = new TerraDrawRectangleMode(
+					drawInteraction ? { drawInteraction } : undefined,
+				);
+				const mockConfig = MockModeConfig(rectangleMode.mode);
+
+				onChange = mockConfig.onChange;
+				onFinish = mockConfig.onFinish;
+				rectangleMode.register(mockConfig);
+				rectangleMode.start();
+
+				rectangleMode.onDragStart(
+					MockCursorEvent({ lng: 0, lat: 0 }),
+					setMapDraggability,
+				);
+
+				expect(onChange).toHaveBeenCalledTimes(0);
+				expect(onFinish).toHaveBeenCalledTimes(0);
+				expect(setMapDraggability).toHaveBeenCalledTimes(0);
+			});
+		});
+
+		describe.each([["click-drag" as const], ["click-move-or-drag" as const]])(
+			"with drawInteraction %s and onDragStart pointer event false",
+			(drawInteraction) => {
+				it("does nothing", () => {
+					rectangleMode = new TerraDrawRectangleMode({
+						drawInteraction,
+						pointerEvents: {
+							...DefaultPointerEvents,
+							onDragStart: false,
+						},
+					});
+
+					const mockConfig = MockModeConfig(rectangleMode.mode);
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
+
+					rectangleMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					expect(onFinish).toHaveBeenCalledTimes(0);
+					expect(onChange).toHaveBeenCalledTimes(0);
+					expect(setMapDraggability).toHaveBeenCalledTimes(0);
+				});
+			},
+		);
+
+		it("with drawInteraction click-move-or-drag and drawType is click it does nothing", () => {
+			rectangleMode = new TerraDrawRectangleMode({
+				drawInteraction: "click-move-or-drag",
+			});
+
+			const mockConfig = MockModeConfig(rectangleMode.mode);
+			onChange = mockConfig.onChange;
+			onFinish = mockConfig.onFinish;
+			rectangleMode.register(mockConfig);
+			rectangleMode.start();
+
+			rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+			onChange.mockClear();
+
+			rectangleMode.onDragStart(
+				MockCursorEvent({ lng: 0, lat: 0 }),
+				setMapDraggability,
+			);
+
+			expect(onChange).toHaveBeenCalledTimes(0);
+			expect(onFinish).toHaveBeenCalledTimes(0);
+			expect(setMapDraggability).toHaveBeenCalledTimes(0);
+		});
+
+		describe.each([["click-drag" as const], ["click-move-or-drag" as const]])(
+			"with drawInteraction %s and drag true",
+			(drawInteraction) => {
+				it("begins drawing", () => {
+					rectangleMode = new TerraDrawRectangleMode({
+						drawInteraction,
+					});
+
+					const mockConfig = MockModeConfig(rectangleMode.mode);
+					onChange = mockConfig.onChange;
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
+
+					rectangleMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					expect(onChange).toHaveBeenCalledTimes(1);
+					expect(onChange).toHaveBeenCalledWith(
+						[expect.any(String)],
+						"create",
+						undefined,
+					);
+					expect(onFinish).not.toHaveBeenCalled();
+					expect(setMapDraggability).toHaveBeenCalledTimes(1);
+					expect(setMapDraggability).toHaveBeenCalledWith(false);
+				});
+			},
+		);
 	});
 
 	describe("onDragEnd", () => {
-		it("does nothing", () => {
-			const rectangleMode = new TerraDrawRectangleMode();
+		let onChange: jest.Mock;
+		let onFinish: jest.Mock;
+		let rectangleMode: TerraDrawRectangleMode;
+		let setMapDraggability: jest.Mock;
+		let store: TerraDrawGeoJSONStore;
 
-			expect(() => {
-				rectangleMode.onDragEnd();
-			}).not.toThrow();
+		beforeEach(() => {
+			setMapDraggability = jest.fn();
 		});
+
+		describe.each([
+			["without drawInteraction option", undefined],
+			["with drawInteraction click-move", "click-move" as const],
+		])("%s", (_, drawInteraction) => {
+			it("does nothing", () => {
+				rectangleMode = new TerraDrawRectangleMode(
+					drawInteraction ? { drawInteraction } : undefined,
+				);
+				const mockConfig = MockModeConfig(rectangleMode.mode);
+				store = mockConfig.store;
+				onChange = mockConfig.onChange;
+				onFinish = mockConfig.onFinish;
+				rectangleMode.register(mockConfig);
+				rectangleMode.start();
+
+				rectangleMode.onDragEnd(
+					MockCursorEvent({ lng: 0, lat: 0 }),
+					setMapDraggability,
+				);
+
+				expect(onChange).toHaveBeenCalledTimes(0);
+				expect(onFinish).toHaveBeenCalledTimes(0);
+				expect(setMapDraggability).toHaveBeenCalledTimes(0);
+			});
+		});
+
+		describe.each([["click-drag" as const], ["click-move-or-drag" as const]])(
+			"with drawInteraction %s and onDragEnd pointer event false",
+			(drawInteraction) => {
+				it("does nothing", () => {
+					rectangleMode = new TerraDrawRectangleMode({
+						drawInteraction,
+						pointerEvents: {
+							...DefaultPointerEvents,
+							onDragEnd: false,
+						},
+					});
+
+					const mockConfig = MockModeConfig(rectangleMode.mode);
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
+
+					rectangleMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					onChange.mockClear();
+					setMapDraggability.mockClear();
+
+					rectangleMode.onDragEnd(
+						MockCursorEvent({ lng: 1, lat: 1 }),
+						setMapDraggability,
+					);
+
+					expect(onChange).toHaveBeenCalledTimes(0);
+					expect(onFinish).toHaveBeenCalledTimes(0);
+					expect(setMapDraggability).toHaveBeenCalledTimes(0);
+				});
+			},
+		);
+
+		describe.each([["click-drag" as const], ["click-move-or-drag" as const]])(
+			"with drawInteraction %s",
+			(drawInteraction) => {
+				it("finishes the rectangle", () => {
+					rectangleMode = new TerraDrawRectangleMode({
+						drawInteraction,
+					});
+
+					const mockConfig = MockModeConfig(rectangleMode.mode);
+					const setMapDraggability = jest.fn();
+
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					const onFinish = mockConfig.onFinish;
+					rectangleMode.register(mockConfig);
+					rectangleMode.start();
+
+					rectangleMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					expect(setMapDraggability).toHaveBeenCalledTimes(1);
+
+					let features = store.copyAll();
+
+					rectangleMode.onDragEnd(
+						MockCursorEvent({ lng: 1, lat: 1 }),
+						setMapDraggability,
+					);
+
+					features = store.copyAll();
+					expect(features.length).toBe(1);
+
+					const rectangle = features[0] as GeoJSONStoreFeatures<Polygon>;
+
+					expect(
+						rectangle.properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+					).toBe(undefined);
+
+					expect(followsRightHandRule(rectangle.geometry)).toBe(true);
+
+					expect(onChange).toHaveBeenCalledTimes(3);
+					expect(onChange).toHaveBeenNthCalledWith(
+						1,
+						[expect.any(String)],
+						"create",
+						undefined,
+					);
+
+					expect(onFinish).toHaveBeenCalledTimes(1);
+					expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
+						action: "draw",
+						mode: "rectangle",
+					});
+
+					expect(setMapDraggability).toHaveBeenCalledTimes(2);
+					expect(setMapDraggability).toHaveBeenNthCalledWith(2, true);
+				});
+			},
+		);
 	});
 
 	describe("styleFeature", () => {

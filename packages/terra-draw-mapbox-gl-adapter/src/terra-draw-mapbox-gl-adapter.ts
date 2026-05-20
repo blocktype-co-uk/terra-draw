@@ -30,7 +30,6 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 		} & TerraDrawExtend.BaseAdapterConfig,
 	) {
 		super(config);
-
 		this._map = config.map;
 		this._container = this._map.getContainer();
 
@@ -55,6 +54,58 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 	private _nextRender: number | undefined;
 	private _map: mapboxgl.Map;
 	private _container: HTMLElement;
+
+	private toGlDashArrayFromPixels(
+		dash: [number, number] | undefined,
+		lineWidth: number,
+	): [number, number] | null {
+		if (!dash) {
+			return null;
+		}
+
+		const [onPx, offPx] = dash;
+		if (
+			!Number.isFinite(onPx) ||
+			!Number.isFinite(offPx) ||
+			onPx < 0 ||
+			offPx < 0
+		) {
+			return null;
+		}
+
+		const width = Math.max(0.0001, lineWidth);
+		return [onPx / width, offPx / width];
+	}
+
+	// Marker state
+	private markerCounter = 0;
+	private markerMap = new Map<string, string>();
+
+	// MapLibre/Mapbox GL do not support sizing icons on both the X and Y axis independently
+	// To maintain compatibility we resize the image to the desired dimensions and then
+	// pass that to MapLibre/Mapbox GL as a base64 string
+	private resizeImage(
+		imageUrl: string,
+		width: number,
+		height: number,
+		callback: (resizedDataURL: string) => void,
+	) {
+		const img = new Image();
+		img.crossOrigin = "anonymous"; // if loading from remote source
+		img.onload = () => {
+			const canvas = document.createElement("canvas");
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext("2d");
+			if (!ctx) {
+				throw new Error("Could not get canvas context");
+			}
+			ctx.drawImage(img, 0, 0, width, height);
+			const resizedDataURL = canvas.toDataURL(); // base64 string
+			callback(resizedDataURL);
+		};
+		img.src = imageUrl;
+	}
 
 	private _addGeoJSONSource(id: string, features: Feature[]) {
 		this._map.addSource(id, {
@@ -95,6 +146,7 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 			paint: {
 				"line-width": ["get", "polygonOutlineWidth"],
 				"line-color": ["get", "polygonOutlineColor"],
+				"line-opacity": ["get", "polygonOutlineOpacity"],
 			},
 		} as LineLayerSpecification);
 
@@ -102,6 +154,14 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 	}
 
 	private _addLineLayer(id: string) {
+		const paint: { "line-dasharray"?: any[] } = {};
+
+		paint["line-dasharray"] = [
+			"coalesce",
+			["get", "lineStringDash"],
+			["literal", []],
+		];
+
 		const layer = this._map.addLayer({
 			id,
 			source: id,
@@ -111,8 +171,10 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 			},
 			// No need for filters as style is driven by properties
 			paint: {
+				...paint,
 				"line-width": ["get", "lineStringWidth"],
 				"line-color": ["get", "lineStringColor"],
+				"line-opacity": ["get", "lineStringOpacity"],
 			},
 		} as LineLayerSpecification);
 
@@ -131,10 +193,28 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 			paint: {
 				"circle-stroke-color": ["get", "pointOutlineColor"],
 				"circle-stroke-width": ["get", "pointOutlineWidth"],
+				"circle-stroke-opacity": ["get", "pointOutlineOpacity"],
 				"circle-radius": ["get", "pointWidth"],
 				"circle-color": ["get", "pointColor"],
+				"circle-opacity": ["get", "pointOpacity"],
 			},
 		} as CircleLayerSpecification);
+
+		return layer;
+	}
+
+	private _addMarkerLayer(id: string) {
+		const layer = this._map.addLayer({
+			id: id + "-marker",
+			source: id,
+			type: "symbol",
+			filter: ["has", "markerId"],
+			layout: {
+				"icon-image": ["get", "markerId"],
+				"icon-anchor": "bottom", // bottom center of icon will be aligned to point
+				"icon-allow-overlap": true,
+			},
+		});
 
 		return layer;
 	}
@@ -145,6 +225,7 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 	) {
 		if (featureType === "Point") {
 			this._addPointLayer(id);
+			this._addMarkerLayer(id);
 		}
 		if (featureType === "LineString") {
 			this._addLineLayer(id);
@@ -351,18 +432,98 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 				properties.zIndex = styles.zIndex;
 
 				if (feature.geometry.type === "Point") {
+					const pointOpacity = (styles as { pointOpacity?: number })
+						.pointOpacity;
+					const pointOutlineOpacity = (
+						styles as { pointOutlineOpacity?: number }
+					).pointOutlineOpacity;
+
 					properties.pointColor = styles.pointColor;
 					properties.pointOutlineColor = styles.pointOutlineColor;
 					properties.pointOutlineWidth = styles.pointOutlineWidth;
+					properties.pointOutlineOpacity =
+						pointOutlineOpacity === undefined ? 1 : pointOutlineOpacity;
 					properties.pointWidth = styles.pointWidth;
+					properties.pointOpacity =
+						pointOpacity === undefined ? 1 : pointOpacity;
+
+					if (
+						styles.markerUrl &&
+						styles.markerWidth &&
+						styles.markerHeight &&
+						!this.markerMap.has(styles.markerUrl)
+					) {
+						const id = `marker-${this.markerCounter++}`;
+
+						this.resizeImage(
+							styles.markerUrl,
+							styles.markerWidth,
+							styles.markerHeight,
+							(resizedDataURL) => {
+								this._map.loadImage(resizedDataURL, (error, image) => {
+									if (!image || error) {
+										// eslint-disable-next-line no-console
+										console.error(
+											`Error loading marker image: ${styles.markerUrl}`,
+											error,
+										);
+										return;
+									}
+
+									this._map.addImage(id, image);
+
+									// We have to set these all explicitly as loadImage is async
+									// and the render will have already happened at this point
+
+									this._map.setLayoutProperty(
+										`${this._prefixId}-point-marker`,
+										"icon-image",
+										id,
+									);
+								});
+							},
+						);
+
+						this.markerMap.set(styles.markerUrl as string, id);
+						properties.markerId = id;
+						properties.pointWidth = 0; // Make circle invisible
+					} else if (
+						styles.markerUrl &&
+						this.markerMap.has(styles.markerUrl as string)
+					) {
+						// Image already loaded
+						properties.markerId = this.markerMap.get(
+							styles.markerUrl,
+						) as string;
+
+						properties.pointWidth = 0;
+					}
+
 					points.push(feature);
 				} else if (feature.geometry.type === "LineString") {
+					properties.lineStringDash = this.toGlDashArrayFromPixels(
+						// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+						(styles as { lineStringDash?: [number, number] }).lineStringDash,
+						styles.lineStringWidth,
+					);
+
 					properties.lineStringColor = styles.lineStringColor;
 					properties.lineStringWidth = styles.lineStringWidth;
+					// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+					const lineStringOpacity = (styles as { lineStringOpacity?: number })
+						.lineStringOpacity;
+					properties.lineStringOpacity =
+						lineStringOpacity === undefined ? 1 : lineStringOpacity;
 					linestrings.push(feature);
 				} else if (feature.geometry.type === "Polygon") {
+					const polygonOutlineOpacity = (
+						styles as { polygonOutlineOpacity?: number }
+					).polygonOutlineOpacity;
+
 					properties.polygonFillColor = styles.polygonFillColor;
 					properties.polygonFillOpacity = styles.polygonFillOpacity;
+					properties.polygonOutlineOpacity =
+						polygonOutlineOpacity === undefined ? 1 : polygonOutlineOpacity;
 					properties.polygonOutlineColor = styles.polygonOutlineColor;
 					properties.polygonOutlineWidth = styles.polygonOutlineWidth;
 					polygons.push(feature);
@@ -440,6 +601,7 @@ export class TerraDrawMapboxGLAdapter extends TerraDrawExtend.TerraDrawBaseAdapt
 		super.unregister();
 
 		this._map.removeLayer(`${this._prefixId}-point`);
+		this._map.removeLayer(`${this._prefixId}-point-marker`);
 		this._map.removeSource(`${this._prefixId}-point`);
 		this._map.removeLayer(`${this._prefixId}-linestring`);
 		this._map.removeSource(`${this._prefixId}-linestring`);

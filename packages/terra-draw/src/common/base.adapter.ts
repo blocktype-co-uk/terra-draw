@@ -8,6 +8,7 @@ import {
 	TerraDrawStylingFunction,
 	GetLngLatFromEvent,
 	TerraDrawAdapter,
+	TerraDrawHandledEvents,
 } from "../common";
 import { limitPrecision } from "../geometry/limit-decimal-precision";
 import { cartesianDistance } from "../geometry/measure/pixel-distance";
@@ -18,6 +19,7 @@ type BaseKeyboardListener = (event: KeyboardEvent) => void;
 type BaseMouseListener = (event: MouseEvent) => void;
 
 export type BaseAdapterConfig = {
+	ignoreMismatchedPointerEvents?: boolean;
 	coordinatePrecision?: number;
 	minPixelDragDistanceDrawing?: number;
 	minPixelDragDistance?: number;
@@ -26,6 +28,11 @@ export type BaseAdapterConfig = {
 
 export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 	constructor(config: BaseAdapterConfig) {
+		this._ignoreMismatchedPointerEvents =
+			typeof config.ignoreMismatchedPointerEvents === "boolean"
+				? config.ignoreMismatchedPointerEvents
+				: false;
+
 		this._minPixelDragDistance =
 			typeof config.minPixelDragDistance === "number"
 				? config.minPixelDragDistance
@@ -48,7 +55,9 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 	}
 
 	private _nextKeyUpIsContextMenu = false;
+	private _lastPointerDownEventTarget: EventTarget | undefined;
 
+	protected _ignoreMismatchedPointerEvents = false;
 	protected _minPixelDragDistance: number;
 	protected _minPixelDragDistanceDrawing: number;
 	protected _minPixelDragDistanceSelecting: number;
@@ -62,7 +71,9 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 		"not-dragging";
 	protected _currentModeCallbacks: TerraDrawCallbacks | undefined;
 
-	public abstract getMapEventElement(): HTMLElement;
+	public abstract getMapEventElement(
+		eventType?: TerraDrawHandledEvents,
+	): HTMLElement;
 
 	protected getButton(event: PointerEvent | MouseEvent) {
 		if (event.button === -1) {
@@ -80,7 +91,12 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 	}
 
 	protected getMapElementXYPosition(event: PointerEvent | MouseEvent) {
-		const mapElement = this.getMapEventElement();
+		const mapElement = this.getMapEventElement(
+			event.type as Extract<
+				TerraDrawHandledEvents,
+				"pointerdown" | "pointerup" | "pointermove"
+			>,
+		);
 		const { left, top } = mapElement.getBoundingClientRect();
 
 		return {
@@ -165,12 +181,19 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 					// triggered so this._lastDrawEvent will not get set in
 					// pointermove listener, so we must set it here.
 					this._lastDrawEvent = drawEvent;
+
+					this._lastPointerDownEventTarget = event.target
+						? event.target
+						: undefined;
 				},
 				register: (callback) => {
-					this.getMapEventElement().addEventListener("pointerdown", callback);
+					this.getMapEventElement("pointerdown").addEventListener(
+						"pointerdown",
+						callback,
+					);
 				},
 				unregister: (callback) => {
-					this.getMapEventElement().removeEventListener(
+					this.getMapEventElement("pointerdown").removeEventListener(
 						"pointerdown",
 						callback,
 					);
@@ -264,11 +287,11 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 					}
 				},
 				register: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("pointermove");
 					mapElement.addEventListener("pointermove", callback);
 				},
 				unregister: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("pointermove");
 					mapElement.removeEventListener("pointermove", callback);
 				},
 			}),
@@ -285,11 +308,11 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 					this._nextKeyUpIsContextMenu = true;
 				},
 				register: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("contextmenu");
 					mapElement.addEventListener("contextmenu", callback);
 				},
 				unregister: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("contextmenu");
 					mapElement.removeEventListener("contextmenu", callback);
 				},
 			}),
@@ -300,9 +323,19 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 						return;
 					}
 
-					if (event.target !== this.getMapEventElement()) {
+					if (event.target !== this.getMapEventElement("pointerup")) {
 						return;
 					}
+
+					// We want to ignore pointer up events where the down event was not on the map element
+					if (
+						this._ignoreMismatchedPointerEvents &&
+						this._lastPointerDownEventTarget !== event.target
+					) {
+						return;
+					}
+
+					this._lastPointerDownEventTarget = undefined;
 
 					// We don't support multitouch as this point in time
 					if (!event.isPrimary) {
@@ -340,11 +373,11 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 					this.setDraggability(true);
 				},
 				register: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("pointerup");
 					mapElement.addEventListener("pointerup", callback);
 				},
 				unregister: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("pointerup");
 					mapElement.removeEventListener("pointerup", callback);
 				},
 			}),
@@ -364,11 +397,11 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 					});
 				},
 				register: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("keyup");
 					mapElement.addEventListener("keyup", callback);
 				},
 				unregister: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("keyup");
 					mapElement.removeEventListener("keyup", callback);
 				},
 			}),
@@ -388,11 +421,11 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 					});
 				},
 				register: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("keydown");
 					mapElement.addEventListener("keydown", callback);
 				},
 				unregister: (callback) => {
-					const mapElement = this.getMapEventElement();
+					const mapElement = this.getMapEventElement("keydown");
 					mapElement.removeEventListener("keydown", callback);
 				},
 			}),
@@ -413,6 +446,9 @@ export abstract class TerraDrawBaseAdapter implements TerraDrawAdapter {
 
 		// This has to come last because we call this._currentModeCallbacks.onClear()
 		this._currentModeCallbacks = undefined;
+		this._lastDrawEvent = undefined;
+		this._lastPointerDownEventTarget = undefined;
+		this._nextKeyUpIsContextMenu = false;
 	}
 
 	public abstract clear(): void;

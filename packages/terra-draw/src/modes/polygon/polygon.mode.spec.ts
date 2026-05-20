@@ -54,6 +54,11 @@ describe("TerraDrawPolygonMode", () => {
 				keyEvents: { cancel: null, finish: null },
 			});
 		});
+
+		it("constructs with custom mode name", () => {
+			const polygonMode = new TerraDrawPolygonMode({ modeName: "custom" });
+			expect(polygonMode.mode).toBe("custom");
+		});
 	});
 
 	describe("updateOptions", () => {
@@ -266,6 +271,12 @@ describe("TerraDrawPolygonMode", () => {
 			});
 
 			expect(mockConfig.onChange).toHaveBeenCalledTimes(0);
+
+			const coordinatePoints = mockConfig.store.copyAllWhere(
+				(properties) =>
+					properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+			);
+			expect(coordinatePoints.length).toBe(0);
 		});
 
 		it("can handle changes to showCoordinatePoints when there are polygons in the mode", () => {
@@ -310,8 +321,105 @@ describe("TerraDrawPolygonMode", () => {
 				2,
 				[featureId],
 				"update",
+				{ target: "properties" },
+			);
+
+			const coordinatePoints = mockConfig.store.copyAllWhere(
+				(properties) =>
+					properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+			);
+			expect(coordinatePoints.length).toBe(4);
+		});
+
+		it("does not throw an error when setting showCoordinatePoints true with existing coordinate points", () => {
+			const polygonMode = new TerraDrawPolygonMode({
+				showCoordinatePoints: false,
+			});
+
+			const mockConfig = MockModeConfig(polygonMode.mode);
+
+			polygonMode.register(mockConfig);
+			polygonMode.start();
+
+			const mockPolygon = MockPolygonSquare();
+			mockConfig.store.create([
+				{
+					geometry: mockPolygon.geometry,
+					properties: mockPolygon.properties as JSONObject,
+				},
+			]);
+
+			polygonMode.updateOptions({
+				showCoordinatePoints: true,
+			});
+
+			expect(() => {
+				polygonMode.updateOptions({
+					showCoordinatePoints: true,
+				});
+			}).not.toThrow();
+		});
+
+		it("removes existing coordinate points when setting showCoordinatePoints to false", () => {
+			const polygonMode = new TerraDrawPolygonMode({
+				showCoordinatePoints: false,
+			});
+
+			const mockConfig = MockModeConfig(polygonMode.mode);
+
+			polygonMode.register(mockConfig);
+			polygonMode.start();
+
+			const mockPolygon = MockPolygonSquare();
+			const [featureId] = mockConfig.store.create([
+				{
+					geometry: mockPolygon.geometry,
+					properties: mockPolygon.properties as JSONObject,
+				},
+			]);
+
+			polygonMode.updateOptions({
+				showCoordinatePoints: true,
+			});
+
+			let coordinatePoints = mockConfig.store.copyAllWhere(
+				(properties) =>
+					properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+			);
+			expect(coordinatePoints.length).toBe(4);
+
+			mockConfig.onChange.mockClear();
+
+			expect(() => {
+				polygonMode.updateOptions({
+					showCoordinatePoints: false,
+				});
+			}).not.toThrow();
+
+			expect(mockConfig.onChange).toHaveBeenCalledTimes(2);
+			expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+				1,
+				[
+					expect.any(String),
+					expect.any(String),
+					expect.any(String),
+					expect.any(String),
+				],
+				"delete",
 				undefined,
 			);
+			expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+				2,
+				[featureId],
+				"update",
+				{ target: "properties" },
+			);
+
+			coordinatePoints = mockConfig.store.copyAllWhere(
+				(properties) =>
+					properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+			);
+			expect(coordinatePoints.length).toBe(0);
 		});
 	});
 
@@ -361,7 +469,7 @@ describe("TerraDrawPolygonMode", () => {
 				2,
 				[featureId],
 				"update",
-				undefined,
+				{ target: "properties" },
 			);
 		});
 
@@ -444,7 +552,7 @@ describe("TerraDrawPolygonMode", () => {
 				2,
 				[featureId],
 				"update",
-				undefined,
+				{ target: "properties" },
 			);
 		});
 
@@ -507,7 +615,7 @@ describe("TerraDrawPolygonMode", () => {
 
 			mockConfig.onChange.mockClear();
 
-			polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), () => {});
+			polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
 
 			expect(mockConfig.onChange).toHaveBeenCalledTimes(1);
 			expect(mockConfig.onChange).toHaveBeenNthCalledWith(
@@ -580,7 +688,7 @@ describe("TerraDrawPolygonMode", () => {
 				1,
 				[snapPoint!.id],
 				"update",
-				undefined,
+				{ target: "geometry" },
 			);
 
 			expect(mockConfig.store.has(snapPoint!.id as FeatureId)).toBe(true);
@@ -772,7 +880,7 @@ describe("TerraDrawPolygonMode", () => {
 				[
 					[0, 0],
 					[1, 1],
-					[1, 0.999999], // Small offset to keep Mapbox GL happy
+					[1, 1],
 					[0, 0],
 				],
 			]);
@@ -911,6 +1019,58 @@ describe("TerraDrawPolygonMode", () => {
 
 			features = store.copyAll();
 			expect(features.length).toBe(2);
+		});
+
+		it("closing points are created as expected", () => {
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 2 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 2 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 3, lat: 3 }));
+
+			const features = store.copyAll();
+			expect(features.length).toBe(3);
+			expect(features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING]).toBe(
+				true,
+			);
+			expect(features[1].properties).toEqual({
+				[COMMON_PROPERTIES.CLOSING_POINT]: true,
+				[COMMON_PROPERTIES.MODE]: "polygon",
+				createdAt: expect.any(Number),
+				updatedAt: expect.any(Number),
+			});
+			expect(features[2].properties).toEqual({
+				[COMMON_PROPERTIES.CLOSING_POINT]: true,
+				[COMMON_PROPERTIES.MODE]: "polygon",
+				createdAt: expect.any(Number),
+				updatedAt: expect.any(Number),
+			});
+		});
+
+		it("closing points respect custom mode name", () => {
+			polygonMode = new TerraDrawPolygonMode({
+				modeName: "custom-polygon",
+			});
+			const mockConfig = MockModeConfig(polygonMode.mode);
+			store = mockConfig.store;
+			polygonMode.register(mockConfig);
+			polygonMode.start();
+
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 2 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 2 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 3, lat: 3 }));
+
+			const features = store.copyAll();
+			expect(features.length).toBe(3);
+			expect(features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING]).toBe(
+				true,
+			);
+			expect(features[1].properties.mode).toEqual("custom-polygon");
+			expect(features[2].properties.mode).toEqual("custom-polygon");
 		});
 
 		it("can create a polygon with toCoordinate snapping enabled", () => {
@@ -1186,6 +1346,7 @@ describe("TerraDrawPolygonMode", () => {
 			const mockConfig = MockModeConfig(polygonMode.mode);
 
 			store = mockConfig.store;
+			onFinish = mockConfig.onFinish;
 			polygonMode.register(mockConfig);
 			polygonMode.start();
 
@@ -1237,18 +1398,18 @@ describe("TerraDrawPolygonMode", () => {
 			expect(store.updateGeometry).toHaveBeenCalledTimes(7);
 
 			polygonMode.onClick(thirdPoint);
-			// Right hand rule is not valid so extra update!
-			expect(store.updateGeometry).toHaveBeenCalledTimes(9);
 
-			// Polygon is now closed
+			polygonMode.onClick(thirdPoint);
+
+			// Polygon is now closed and corrected to right hand rule
 			expect(store.updateGeometry).toHaveBeenNthCalledWith(8, [
 				{
 					geometry: {
 						coordinates: [
 							[
 								[1, 1],
-								[2, 2],
 								[3, 3],
+								[2, 2],
 								[1, 1],
 							],
 						],
@@ -1257,6 +1418,12 @@ describe("TerraDrawPolygonMode", () => {
 					id: expect.any(String),
 				},
 			]);
+
+			expect(onFinish).toHaveBeenCalledTimes(1);
+			expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
+				action: "draw",
+				mode: "polygon",
+			});
 		});
 
 		it("right click can delete a point if editable is true", () => {
@@ -1293,6 +1460,86 @@ describe("TerraDrawPolygonMode", () => {
 			expect(onFinish).toHaveBeenCalledTimes(2);
 		});
 
+		it("right click deletes the snapping point when deleting a coordinate", () => {
+			polygonMode.updateOptions({
+				snapping: {
+					toCoordinate: true,
+				},
+			});
+
+			// Create a polygon the cursor can snap to
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 0 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 1 }));
+
+			// Create a snapping point
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 0.5, lat: 0.5 }));
+
+			let features = store.copyAll();
+			expect(
+				features.some(
+					(feature) => feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
+				),
+			).toBe(true);
+
+			// Delete a coordinate
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 0, button: "right" }));
+
+			features = store.copyAll();
+			expect(
+				features.some(
+					(feature) => feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
+				),
+			).toBe(false);
+		});
+
+		it("right click deletes the snapping point but updates it to the closest nearby coordinate", () => {
+			polygonMode.updateOptions({
+				snapping: {
+					toCoordinate: true,
+				},
+			});
+
+			// Create a polygon the cursor can snap to
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 0.2, lat: 0 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 0.2, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 1 }));
+
+			// Create a snapping point (should snap to [0,0] inside/near the square)
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 0.2, lat: 0 }));
+
+			let features = store.copyAll();
+			const snapPointBefore = features.find(
+				(feature) => feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
+			);
+			expect(snapPointBefore).toBeDefined();
+			expect(snapPointBefore!.geometry.type).toBe("Point");
+			expect(snapPointBefore!.geometry.coordinates).toStrictEqual([0.2, 0]);
+
+			// Delete the [1,0] coordinate
+			polygonMode.onClick(
+				MockCursorEvent({ lng: 0.2, lat: 0, button: "right" }),
+			);
+
+			features = store.copyAll();
+			const snapPointAfter = features.find(
+				(feature) => feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
+			);
+			expect(snapPointAfter).toBeDefined();
+			expect(snapPointAfter!.geometry.type).toBe("Point");
+			expect(snapPointAfter!.geometry.coordinates).toStrictEqual([0, 0]);
+		});
+
 		it("context menu click can delete a point if editable is true", () => {
 			polygonMode.updateOptions({
 				pointerEvents: {
@@ -1322,6 +1569,10 @@ describe("TerraDrawPolygonMode", () => {
 			expect(features.length).toBe(1);
 
 			expect(onFinish).toHaveBeenCalledTimes(1);
+			expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
+				action: "draw",
+				mode: "polygon",
+			});
 
 			// Delete a coordinate
 			polygonMode.onClick(
@@ -1340,6 +1591,10 @@ describe("TerraDrawPolygonMode", () => {
 			);
 
 			expect(onFinish).toHaveBeenCalledTimes(2);
+			expect(onFinish).toHaveBeenNthCalledWith(2, expect.any(String), {
+				action: "edit",
+				mode: "polygon",
+			});
 		});
 
 		it("context menu click cannot delete a point whilst currently drawing if editable is true", () => {
@@ -1488,6 +1743,10 @@ describe("TerraDrawPolygonMode", () => {
 			).toBe(undefined);
 
 			expect(onFinish).toHaveBeenCalledTimes(1);
+			expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
+				action: "draw",
+				mode: "polygon",
+			});
 		});
 
 		describe("with leftClick pointer event set to false", () => {
@@ -1762,6 +2021,173 @@ describe("TerraDrawPolygonMode", () => {
 			expect(features.length).toBe(3);
 		});
 	});
+
+	describe("undo and redo", () => {
+		let polygonMode: TerraDrawPolygonMode;
+		let store: TerraDrawGeoJSONStore;
+
+		beforeEach(() => {
+			polygonMode = new TerraDrawPolygonMode();
+			const mockConfig = MockModeConfig(polygonMode.mode);
+
+			store = mockConfig.store;
+			polygonMode.register(mockConfig);
+			polygonMode.start();
+		});
+
+		it("undoes and redoes committed drawing coordinates", () => {
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 0 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+
+			let features = store.copyAll();
+			expect(features.length).toBe(3);
+			expect(features[0].geometry.coordinates[0]).toStrictEqual([
+				[0, 0],
+				[1, 0],
+				[1, 1],
+				[1, 1],
+				[0, 0],
+			]);
+
+			polygonMode.undo();
+
+			features = store.copyAll();
+			expect(features.length).toBe(1);
+			expect(features[0].geometry.coordinates[0]).toStrictEqual([
+				[0, 0],
+				[1, 0],
+				[1, 0],
+				[0, 0],
+			]);
+
+			polygonMode.redo();
+
+			features = store.copyAll();
+			expect(features.length).toBe(3);
+			expect(features[0].geometry.coordinates[0]).toStrictEqual([
+				[0, 0],
+				[1, 0],
+				[1, 1],
+				[1, 1],
+				[0, 0],
+			]);
+		});
+
+		it("undoes the first coordinate and allows redo", () => {
+			polygonMode.onClick(MockCursorEvent({ lng: 5, lat: 5 }));
+
+			let features = store.copyAll();
+			expect(features.length).toBe(1);
+			expect(features[0].geometry.coordinates[0]).toStrictEqual([
+				[5, 5],
+				[5, 5],
+				[5, 5],
+				[5, 5],
+			]);
+
+			polygonMode.undo();
+
+			features = store.copyAll();
+			expect(features.length).toBe(0);
+
+			polygonMode.redo();
+
+			features = store.copyAll();
+			expect(features.length).toBe(1);
+			expect(features[0].geometry.coordinates[0]).toStrictEqual([
+				[5, 5],
+				[5, 5],
+				[5, 5],
+				[5, 5],
+			]);
+		});
+
+		it("removes snapping guidance point when undo changes drawing context", () => {
+			polygonMode = new TerraDrawPolygonMode({
+				snapping: {
+					toCustom: (_event, context) =>
+						context.currentId ? [10, 10] : undefined,
+				},
+			});
+
+			const mockConfig = MockModeConfig(polygonMode.mode);
+			store = mockConfig.store;
+			polygonMode.register(mockConfig);
+			polygonMode.start();
+
+			polygonMode.onClick(MockCursorEvent({ lng: 5, lat: 5 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 6, lat: 6 }));
+
+			let features = store.copyAll();
+			expect(features.length).toBe(2);
+
+			polygonMode.undo();
+
+			features = store.copyAll();
+			expect(features.length).toBe(0);
+		});
+
+		it("updates snapping guidance point when redo restores drawing context", () => {
+			polygonMode = new TerraDrawPolygonMode({
+				snapping: {
+					toCustom: (_event, context) =>
+						context.currentId ? [20, 20] : [10, 10],
+				},
+			});
+
+			const mockConfig = MockModeConfig(polygonMode.mode);
+			store = mockConfig.store;
+			polygonMode.register(mockConfig);
+			polygonMode.start();
+
+			polygonMode.onClick(MockCursorEvent({ lng: 5, lat: 5 }));
+			polygonMode.undo();
+
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 6, lat: 6 }));
+
+			let features = store.copyAll();
+			expect(features.length).toBe(1);
+			let snappingPointFeature = features.find(
+				(feature) => feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
+			);
+			expect(snappingPointFeature?.geometry.coordinates).toStrictEqual([
+				10, 10,
+			]);
+
+			polygonMode.redo();
+
+			features = store.copyAll();
+			expect(features.length).toBe(2);
+			snappingPointFeature = features.find(
+				(feature) => feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
+			);
+			expect(snappingPointFeature?.geometry.coordinates).toStrictEqual([
+				20, 20,
+			]);
+		});
+
+		it("does not recreate closing points when undoing from four coordinates to three", () => {
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 0 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 0 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+			polygonMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 1 }));
+			polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 1 }));
+
+			expect(() => polygonMode.undo()).not.toThrow();
+
+			const features = store.copyAll();
+			const closingPointFeatures = features.filter(
+				(feature) => feature.properties[COMMON_PROPERTIES.CLOSING_POINT],
+			);
+
+			expect(closingPointFeatures.length).toBe(2);
+		});
+	});
 });
 
 describe("cleanUp", () => {
@@ -1795,6 +2221,22 @@ describe("cleanUp", () => {
 		// Removes the LineString that was being created
 		expect(store.copyAll().length).toBe(0);
 	});
+
+	it('cleans up coordinate points if "showCoordinatePoints" is enabled', () => {
+		polygonMode.updateOptions({
+			showCoordinatePoints: true,
+		});
+
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+		// 1 Polygon + 3 Coordinate Points
+		expect(store.copyAll().length).toBe(4);
+
+		polygonMode.cleanUp();
+
+		// Removes the Polygon and Coordinate Points
+		expect(store.copyAll().length).toBe(0);
+	});
 });
 
 describe("onDragStart", () => {
@@ -1804,7 +2246,7 @@ describe("onDragStart", () => {
 		polygonMode.register(mockConfig);
 		polygonMode.start();
 
-		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), () => {});
+		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
 		expect(mockConfig.onChange).not.toHaveBeenCalled();
 		expect(mockConfig.onFinish).not.toHaveBeenCalled();
 	});
@@ -1842,7 +2284,7 @@ describe("onDragStart", () => {
 		mockConfig.onChange.mockClear();
 		mockConfig.setCursor.mockClear();
 
-		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), () => {});
+		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
 
 		expect(mockConfig.onChange).toHaveBeenCalledTimes(1);
 		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
@@ -1865,7 +2307,7 @@ describe("onDrag", () => {
 		const mockConfig = MockModeConfig(polygonMode.mode);
 		polygonMode.register(mockConfig);
 
-		polygonMode.onDrag(MockCursorEvent({ lng: 0, lat: 0 }), () => {});
+		polygonMode.onDrag(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
 		expect(mockConfig.onChange).not.toHaveBeenCalled();
 	});
 
@@ -1896,32 +2338,26 @@ describe("onDrag", () => {
 		let features = mockConfig.store.copyAll();
 		expect(features.length).toBe(1);
 
-		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), () => {});
+		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
 
 		// Reset to make it easier to track for onDragStart
 		mockConfig.onChange.mockClear();
 		mockConfig.setCursor.mockClear();
 
-		polygonMode.onDrag(MockCursorEvent({ lng: 1, lat: 1 }), () => {});
+		polygonMode.onDrag(MockCursorEvent({ lng: 1, lat: 1 }), jest.fn());
 
 		expect(mockConfig.onChange).toHaveBeenCalledTimes(3);
 		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
 			1,
 			[expect.any(String)],
 			"update",
-			undefined,
+			{ target: "geometry" },
 		);
 		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
 			2,
 			[expect.any(String)],
 			"update",
-			undefined,
-		);
-		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
-			3,
-			[expect.any(String)],
-			"update",
-			undefined,
+			{ target: "properties" },
 		);
 
 		const allFeatures = mockConfig.store.copyAll();
@@ -1940,6 +2376,242 @@ describe("onDrag", () => {
 		// We don't change the cursor in onDrag
 		expect(mockConfig.setCursor).toHaveBeenCalledTimes(0);
 	});
+
+	it("updates a single coordinate point when showCoordinatePoints is true and no point is inserted", () => {
+		const polygonMode = new TerraDrawPolygonMode({
+			editable: true,
+			showCoordinatePoints: true,
+		});
+		const mockConfig = MockModeConfig(polygonMode.mode);
+		polygonMode.register(mockConfig);
+		polygonMode.start();
+
+		// Create a polygon to edit
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 2 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 2 }));
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 3, lat: 3 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 3, lat: 3 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 3, lat: 3 }));
+
+		// Expect coordinate points to exist for a closed polygon: 5 polygon coords -> 4 coordinate points
+		let coordinatePoints = mockConfig.store.copyAllWhere(
+			(properties) => properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+		);
+		expect(coordinatePoints.length).toBe(4);
+
+		// Start dragging an existing coordinate (no insert)
+		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
+
+		jest.spyOn(mockConfig.store, "updateProperty");
+
+		polygonMode.onDrag(MockCursorEvent({ lng: -1, lat: -1 }), jest.fn());
+
+		coordinatePoints = mockConfig.store
+			.copyAllWhere(
+				(properties) =>
+					properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+			)
+			.sort(
+				(a, b) =>
+					(a.properties.index as number) - (b.properties.index as number),
+			);
+
+		const coordinatePointIds = coordinatePoints.map((p) => p.id);
+
+		expect(coordinatePoints.length).toBe(4);
+		expect(coordinatePoints.map((p) => p.properties.index)).toStrictEqual([
+			0, 1, 2, 3,
+		]);
+		expect(coordinatePoints[0].geometry.type).toBe("Point");
+		expect(coordinatePoints[0].geometry.coordinates).toStrictEqual([-1, -1]);
+
+		const polygon = mockConfig.store
+			.copyAll()
+			.find((f) => f.geometry.type === "Polygon") as GeoJSONStoreFeatures;
+
+		expect(polygon).toBeDefined();
+		expect(polygon.properties.edited).toBe(true);
+		expect(polygon.properties.coordinatePointIds).toEqual(coordinatePointIds);
+		expect(polygon.geometry.coordinates).toEqual([
+			[
+				[-1, -1],
+				[3, 3],
+				[2, 2],
+				[1, 1],
+				[-1, -1],
+			],
+		]);
+	});
+
+	it("creates a drag point if none exists on a line", () => {
+		const polygonMode = new TerraDrawPolygonMode({ editable: true });
+		const mockConfig = MockModeConfig(polygonMode.mode);
+		polygonMode.register(mockConfig);
+		polygonMode.start();
+
+		// Create a polygon to edit
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 0 }));
+
+		polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 0 }));
+
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 2 }));
+
+		polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 2 }));
+
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 2 }));
+
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 2 }));
+
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 2 }));
+
+		expect(mockConfig.onFinish).toHaveBeenCalledTimes(1);
+
+		// Ensure it's there
+		let features = mockConfig.store.copyAll();
+		expect(features.length).toBe(1);
+
+		polygonMode.onDragStart(MockCursorEvent({ lng: 1, lat: 0 }), jest.fn());
+
+		// Reset to make it easier to track for onDrag
+		mockConfig.onChange.mockClear();
+		mockConfig.setCursor.mockClear();
+
+		polygonMode.onDrag(MockCursorEvent({ lng: 1, lat: 1 }), jest.fn());
+
+		expect(mockConfig.onChange).toHaveBeenCalledTimes(3);
+		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+			1,
+			[expect.any(String)],
+			"update",
+			{ target: "geometry" },
+		);
+		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+			2,
+			[expect.any(String)],
+			"update",
+			{ target: "properties" },
+		);
+		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+			3,
+			[expect.any(String)],
+			"update",
+			{ target: "geometry" },
+		);
+
+		const allFeatures = mockConfig.store.copyAll();
+
+		expect(allFeatures.length).toBe(2);
+
+		// Edited polygon
+		expect(allFeatures[0].geometry.type).toBe("Polygon");
+		expect(allFeatures[0].properties.edited).toBe(true);
+		expect(allFeatures[0].geometry.coordinates).toEqual([
+			[
+				[0, 0],
+				[1, 1],
+				[2, 0],
+				[2, 2],
+				[0, 2],
+				[0, 0],
+			],
+		]);
+
+		// Edit point
+		expect(allFeatures[1].geometry.type).toBe("Point");
+		expect(allFeatures[1].properties.edited).toBe(true);
+		expect(allFeatures[1].geometry.coordinates).toEqual([1, 1]);
+
+		// We don't change the cursor in onDrag
+		expect(mockConfig.setCursor).toHaveBeenCalledTimes(0);
+	});
+
+	it("recreates coordinate points in the correct order when showCoordinatePoints is true and a point is inserted", () => {
+		const polygonMode = new TerraDrawPolygonMode({
+			editable: true,
+			showCoordinatePoints: true,
+		});
+		const mockConfig = MockModeConfig(polygonMode.mode);
+
+		polygonMode.register(mockConfig);
+		polygonMode.start();
+
+		// Create a square polygon to edit
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 0 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 0 }));
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 2, lat: 2 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 2, lat: 2 }));
+		polygonMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 2 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 2 }));
+		polygonMode.onClick(MockCursorEvent({ lng: 0, lat: 2 }));
+
+		let coordinatePoints = mockConfig.store.copyAllWhere(
+			(properties) => properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+		);
+		expect(coordinatePoints.length).toBe(4);
+
+		jest.spyOn(mockConfig.store, "create");
+
+		// Dragging from a line creates a edited coordinate point
+		polygonMode.onDragStart(MockCursorEvent({ lng: 1, lat: 0 }), jest.fn());
+
+		expect(mockConfig.store.create).toHaveBeenCalledTimes(1);
+		expect(mockConfig.store.create).toHaveBeenCalledWith([
+			{
+				geometry: { coordinates: [1, 0], type: "Point" },
+				properties: { edited: true, mode: "polygon" },
+				type: "Feature",
+			},
+		]);
+
+		(mockConfig.store.create as jest.Mock).mockClear();
+
+		jest.spyOn(mockConfig.store, "updateGeometry");
+		jest.spyOn(mockConfig.store, "updateProperty");
+
+		polygonMode.onDrag(MockCursorEvent({ lng: 1, lat: 1 }), jest.fn());
+
+		coordinatePoints = mockConfig.store
+			.copyAllWhere(
+				(properties) =>
+					properties[COMMON_PROPERTIES.COORDINATE_POINT] as boolean,
+			)
+			.sort(
+				(a, b) =>
+					(a.properties.index as number) - (b.properties.index as number),
+			);
+
+		const coordinatePointIds = coordinatePoints.map(({ id }) => id);
+
+		// Polygon now has 6 coordinates (including closing), so 5 coordinate points
+		expect(coordinatePoints.length).toBe(5);
+		expect(coordinatePoints.map((p) => p.properties.index)).toStrictEqual([
+			0, 1, 2, 3, 4,
+		]);
+		expect(coordinatePoints[1].geometry.type).toBe("Point");
+		expect(coordinatePoints[1].geometry.coordinates).toStrictEqual([1, 1]);
+
+		expect(mockConfig.store.updateProperty).toHaveBeenCalledTimes(2);
+		expect(mockConfig.store.updateProperty).toHaveBeenNthCalledWith(1, [
+			{
+				id: expect.any(String),
+				property: "edited",
+				value: true,
+			},
+		]);
+		expect(mockConfig.store.updateProperty).toHaveBeenNthCalledWith(2, [
+			{
+				id: expect.any(String),
+				property: "coordinatePointIds",
+				value: coordinatePointIds,
+			},
+		]);
+	});
 });
 
 describe("onDragEnd", () => {
@@ -1948,7 +2620,7 @@ describe("onDragEnd", () => {
 		const mockConfig = MockModeConfig(polygonMode.mode);
 		polygonMode.register(mockConfig);
 
-		polygonMode.onDragEnd(MockCursorEvent({ lng: 0, lat: 0 }), () => {});
+		polygonMode.onDragEnd(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
 		expect(mockConfig.onChange).not.toHaveBeenCalled();
 	});
 
@@ -1981,35 +2653,39 @@ describe("onDragEnd", () => {
 		let features = mockConfig.store.copyAll();
 		expect(features.length).toBe(1);
 
-		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), () => {});
+		polygonMode.onDragStart(MockCursorEvent({ lng: 0, lat: 0 }), jest.fn());
 
-		polygonMode.onDrag(MockCursorEvent({ lng: 1, lat: 1 }), () => {});
+		polygonMode.onDrag(MockCursorEvent({ lng: 1, lat: 1 }), jest.fn());
 
 		// Reset to make it easier to track for onDragStart
 		mockConfig.onChange.mockClear();
 		mockConfig.setCursor.mockClear();
 
-		polygonMode.onDragEnd(MockCursorEvent({ lng: 1, lat: 1 }), () => {});
+		polygonMode.onDragEnd(MockCursorEvent({ lng: 1, lat: 1 }), jest.fn());
 
 		expect(mockConfig.onChange).toHaveBeenCalledTimes(2);
 
-		// Remove the edit drag point
+		// Remove the edited property from the polygonux
 		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
 			1,
+			[expect.any(String)],
+			"update",
+			{ target: "properties" },
+		);
+
+		// Remove the edit drag point
+		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+			2,
 			[expect.any(String)],
 			"delete",
 			undefined,
 		);
 
-		// Remove the edited property from the polygonux
-		expect(mockConfig.onChange).toHaveBeenNthCalledWith(
-			2,
-			[expect.any(String)],
-			"update",
-			undefined,
-		);
-
 		expect(mockConfig.onFinish).toHaveBeenCalledTimes(1);
+		expect(mockConfig.onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
+			action: "edit",
+			mode: "polygon",
+		});
 	});
 });
 
@@ -2196,6 +2872,42 @@ describe("validateFeature", () => {
 		).toEqual({
 			valid: false,
 			reason: "Feature mode property does not match the mode being added to",
+		});
+	});
+
+	it("returns false with reason for polygon feature with invalid id strategy", () => {
+		const polygonMode = new TerraDrawPolygonMode({
+			validation: () => ({
+				valid: true,
+			}),
+		});
+		polygonMode.register(MockModeConfig("polygon"));
+
+		expect(
+			polygonMode.validateFeature({
+				id: "00000000-00000000-00000000-00000000",
+				type: "Feature",
+				geometry: {
+					type: "Polygon",
+					coordinates: [
+						[
+							[-1.812744141, 52.429222278],
+							[-1.889648438, 51.652110862],
+							[0.505371094, 52.052490476],
+							[-0.417480469, 52.476089041],
+							[-1.812744141, 52.429222278],
+						],
+					],
+				},
+				properties: {
+					mode: "polygon",
+					createdAt: 1685655516297,
+					updatedAt: 1685655518118,
+				},
+			}),
+		).toEqual({
+			valid: false,
+			reason: "Feature must match the id strategy (default is UUID4)",
 		});
 	});
 

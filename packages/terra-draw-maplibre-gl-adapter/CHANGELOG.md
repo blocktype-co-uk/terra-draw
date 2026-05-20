@@ -2,6 +2,67 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.4.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.4.0...terra-draw-maplibre-gl-adapter@1.4.1) (2026-05-17)
+
+
+### fix
+
+* **terra-draw-maplibre-gl-adapter:** fix linestring rendering (#893) ([](https://github.com/JamesLMilner/terra-draw/commit/fc2f74de2b7b124f6a1a3cb3966b659eae3cf8fa)), closes [#893](https://github.com/JamesLMilner/terra-draw/issues/893)
+* **terra-draw-maplibre-gl-adapter:** use version off of map rather than getVersion import (#894) ([](https://github.com/JamesLMilner/terra-draw/commit/e63fe7990dfe1bd7d85358ee3439589c66d0dc7e)), closes [#894](https://github.com/JamesLMilner/terra-draw/issues/894)
+
+## [1.4.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.3.0...terra-draw-maplibre-gl-adapter@1.4.0) (2026-05-07)
+
+
+### feat
+
+* **terra-draw-maplibre-gl-adapter:** add initial support for dashed lines (#883) ([](https://github.com/JamesLMilner/terra-draw/commit/c75910f3a95a3afb8dcf9e247b422ae064daa691)), closes [#883](https://github.com/JamesLMilner/terra-draw/issues/883)
+
+## [1.3.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.2.3...terra-draw-maplibre-gl-adapter@1.3.0) (2026-02-01)
+
+
+### chore
+
+* **terra-draw-maplibre-gl-adapter:** add support for polygon outline opacity (#797) ([](https://github.com/JamesLMilner/terra-draw/commit/1f8d6cf5ae17de4e63498eda7948464aab444ae3)), closes [#797](https://github.com/JamesLMilner/terra-draw/issues/797)
+
+
+### feat
+
+* **terra-draw-maplibre-gl-adapter:** add support for point and linestring opacity (#790) ([](https://github.com/JamesLMilner/terra-draw/commit/c9a7e7a693dc86c8170ed987ed6da354a10cf3a8)), closes [#790](https://github.com/JamesLMilner/terra-draw/issues/790)
+
+## [1.2.3](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.2.2...terra-draw-maplibre-gl-adapter@1.2.3) (2025-12-01)
+
+
+### fix
+
+* **terra-draw-maplibre-gl-adapter:** render outline above fill layer when using renderBelowLayerId (#728) ([](https://github.com/JamesLMilner/terra-draw/commit/8a11cb1558b41c91494e8294aa9ae7f1831047d0)), closes [#728](https://github.com/JamesLMilner/terra-draw/issues/728)
+
+## [1.2.2](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.2.1...terra-draw-maplibre-gl-adapter@1.2.2) (2025-10-14)
+
+
+### fix
+
+* **terra-draw-maplibre-gl-adapter:** use hasImage to determine if marker is loaded (#684) ([](https://github.com/JamesLMilner/terra-draw/commit/936df1b37ae5149e24d3feb02410da322903f2da)), closes [#684](https://github.com/JamesLMilner/terra-draw/issues/684)
+
+## [1.2.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.2.0...terra-draw-maplibre-gl-adapter@1.2.1) (2025-10-13)
+
+
+### fix
+
+* **terra-draw-maplibre-gl-adapter:** fix raised issue with multiple markers (#681) ([](https://github.com/JamesLMilner/terra-draw/commit/5d86fe89cd8a517a5cc66be53c8b4c1eb2153ea3)), closes [#681](https://github.com/JamesLMilner/terra-draw/issues/681)
+
+## [1.2.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.1.2...terra-draw-maplibre-gl-adapter@1.2.0) (2025-10-12)
+
+
+### fix
+
+* **terra-draw-maplibre-gl-adapter:** ensure zIndex is set for all geometry types (#619) ([](https://github.com/JamesLMilner/terra-draw/commit/b34cee9d7eb5d70cc8dd73b13f31835627d2b3b3)), closes [#619](https://github.com/JamesLMilner/terra-draw/issues/619)
+* **terra-draw-maplibre-gl-adapter:** remove unused scaling for markers (#679) ([](https://github.com/JamesLMilner/terra-draw/commit/504276ad5a9af20418c83be2b3f8ebe17184f40c)), closes [#679](https://github.com/JamesLMilner/terra-draw/issues/679)
+
+
+### feat
+
+* **terra-draw-maplibre-gl-adapter:** add support for markers (#674) ([](https://github.com/JamesLMilner/terra-draw/commit/8aebe3b9ec3e2b42bb6b5b18617d6d755a950435)), closes [#674](https://github.com/JamesLMilner/terra-draw/issues/674)
+
 ## [1.1.2](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.1.1...terra-draw-maplibre-gl-adapter@1.1.2) (2025-08-05)
 
 

@@ -1,6 +1,6 @@
 import { BehaviorConfig, TerraDrawModeBehavior } from "./base.behavior";
 import {
-	OnChangeContext,
+	TerraDrawOnChangeContext,
 	HexColor,
 	OnFinishContext,
 	Projection,
@@ -12,6 +12,9 @@ import {
 	TerraDrawMouseEvent,
 	UpdateTypes,
 	Validation,
+	HexColorStyling,
+	NumericStyling,
+	UrlStyling,
 } from "../common";
 import {
 	FeatureId,
@@ -25,8 +28,10 @@ export type CustomStyling = Record<
 	string,
 	| string
 	| number
-	| ((feature: GeoJSONStoreFeatures) => HexColor)
-	| ((feature: GeoJSONStoreFeatures) => number)
+	| HexColorStyling
+	| NumericStyling
+	| UrlStyling
+	| [number, number]
 >;
 
 export enum ModeTypes {
@@ -47,6 +52,8 @@ export const DefaultPointerEvents = {
 
 type AllowPointerEvent = boolean | ((event: TerraDrawMouseEvent) => boolean);
 
+export type ModeUpdateOptions<Mode> = Omit<Mode, "modeName">;
+
 export interface PointerEvents {
 	leftClick: AllowPointerEvent;
 	rightClick: AllowPointerEvent;
@@ -57,6 +64,7 @@ export interface PointerEvents {
 }
 
 export type BaseModeOptions<Styling extends CustomStyling> = {
+	modeName?: string;
 	styles?: Partial<Styling>;
 	pointerDistance?: number;
 	validation?: Validation;
@@ -96,7 +104,10 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 	protected validate: Validation | undefined;
 	protected pointerDistance: number = 40;
 	protected coordinatePrecision!: number;
-	protected onStyleChange!: StoreChangeHandler<OnChangeContext | undefined>;
+	protected undoRedoMaxStackSize?: number;
+	protected onStyleChange!: StoreChangeHandler<
+		TerraDrawOnChangeContext | undefined
+	>;
 	protected store!: TerraDrawGeoJSONStore;
 	protected projection: Projection = "web-mercator";
 
@@ -106,6 +117,8 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 	protected setCursor!: TerraDrawModeRegisterConfig["setCursor"];
 	protected registerBehaviors(behaviorConfig: BehaviorConfig): void {}
 
+	private isInitialUpdate = false;
+
 	constructor(
 		options?: BaseModeOptions<Styling>,
 		willCallUpdateOptionsInParentClass = false,
@@ -113,7 +126,10 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 		// Note: We want to updateOptions on the base class by default, but we don't want it to be
 		// called twice if the extending class is going to call it as well
 		if (!willCallUpdateOptionsInParentClass) {
-			this.updateOptions(options);
+			this.updateOptions({ ...options });
+		} else {
+			// Indicates we are about to have updateOptions called in the parent class
+			this.isInitialUpdate = true;
 		}
 	}
 
@@ -137,6 +153,12 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 		if (options?.pointerEvents !== undefined) {
 			this.pointerEvents = options.pointerEvents;
 		}
+
+		if (options?.modeName && this.isInitialUpdate === true) {
+			this.mode = options.modeName;
+		}
+
+		this.isInitialUpdate = false;
 	}
 
 	protected allowPointerEvent(
@@ -200,6 +222,7 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 			this.onStyleChange = config.onChange;
 			this.onFinish = config.onFinish;
 			this.coordinatePrecision = config.coordinatePrecision;
+			this.undoRedoMaxStackSize = config.undoRedoMaxStackSize;
 
 			this.registerBehaviors({
 				mode: config.mode,
@@ -209,6 +232,7 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 				pointerDistance: this.pointerDistance,
 				coordinatePrecision: config.coordinatePrecision,
 				projection: this.projection,
+				undoRedoMaxStackSize: config.undoRedoMaxStackSize,
 			});
 		} else {
 			throw new Error("Can not register unless mode is unregistered");
@@ -233,7 +257,11 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 			this.store.idStrategy.isValidId,
 		);
 
-		// We also want tp validate based on any specific valdiations passed in
+		if (!validStoreFeature.valid) {
+			return validStoreFeature;
+		}
+
+		// We also want to validate based on any specific valdiations passed in
 		if (this.validate) {
 			const validation = this.validate(feature as GeoJSONStoreFeatures, {
 				project: this.project,
@@ -243,14 +271,12 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 			});
 
 			return {
-				// validatedFeature: feature as GeoJSONStoreFeatures,
 				valid: validStoreFeature.valid && validation.valid,
 				reason: validation.reason,
 			};
 		}
 
 		return {
-			// validatedFeature: feature as GeoJSONStoreFeatures,
 			valid: validStoreFeature.valid,
 			reason: validStoreFeature.reason,
 		};
@@ -290,6 +316,15 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 	onSelect(selectedId: FeatureId) {}
 	onKeyDown(event: TerraDrawKeyboardEvent) {}
 	onKeyUp(event: TerraDrawKeyboardEvent) {}
+	undo() {}
+	clearHistory() {}
+	undoSize() {
+		return 0;
+	}
+	redoSize() {
+		return 0;
+	}
+	redo() {}
 	onMouseMove(event: TerraDrawMouseEvent) {}
 	onClick(event: TerraDrawMouseEvent) {}
 	onDragStart(
@@ -306,7 +341,10 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 	) {}
 
 	protected getHexColorStylingValue(
-		value: HexColor | ((feature: GeoJSONStoreFeatures) => HexColor) | undefined,
+		value:
+			| HexColor
+			| ((feature: GeoJSONStoreFeatures) => HexColor | undefined)
+			| undefined,
 		defaultValue: HexColor,
 		feature: GeoJSONStoreFeatures,
 	): HexColor {
@@ -314,22 +352,33 @@ export abstract class TerraDrawBaseDrawMode<Styling extends CustomStyling> {
 	}
 
 	protected getNumericStylingValue(
-		value: number | ((feature: GeoJSONStoreFeatures) => number) | undefined,
+		value:
+			| number
+			| ((feature: GeoJSONStoreFeatures) => number | undefined)
+			| undefined,
 		defaultValue: number,
 		feature: GeoJSONStoreFeatures,
 	): number {
 		return this.getStylingValue(value, defaultValue, feature);
 	}
 
+	protected getUrlStylingValue(
+		value: UrlStyling | undefined,
+		defaultValue: string,
+		feature: GeoJSONStoreFeatures,
+	): string {
+		return this.getStylingValue(value, defaultValue, feature);
+	}
+
 	private getStylingValue<T extends string | number>(
-		value: T | ((feature: GeoJSONStoreFeatures) => T) | undefined,
+		value: T | ((feature: GeoJSONStoreFeatures) => T | undefined) | undefined,
 		defaultValue: T,
 		feature: GeoJSONStoreFeatures,
 	) {
 		if (value === undefined) {
 			return defaultValue;
 		} else if (typeof value === "function") {
-			return value(feature);
+			return value(feature) ?? defaultValue;
 		} else {
 			return value;
 		}

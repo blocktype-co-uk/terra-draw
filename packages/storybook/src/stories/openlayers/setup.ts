@@ -2,7 +2,7 @@ import Feature from "ol/Feature";
 import GeoJSON from "ol/format/GeoJSON";
 import Map from "ol/Map";
 import View from "ol/View";
-import { Circle, Fill, Stroke, Style } from "ol/style";
+import { Circle, Fill, Icon, Stroke, Style } from "ol/style";
 import { OSM, Vector as VectorSource } from "ol/source";
 import { Tile as TileLayer, Vector as VectorLayer } from "ol/layer";
 import { toLonLat, fromLonLat, getUserProjection } from "ol/proj";
@@ -10,7 +10,8 @@ import Projection from "ol/proj/Projection";
 import {
 	setupMapContainer,
 	setupControls,
-	onNextFrame,
+	SetupUndoRedo,
+	whenElementExists,
 } from "../../common/setup";
 import { TerraDraw } from "../../../../terra-draw/src/terra-draw";
 import { TerraDrawOpenLayersAdapter } from "../../../../terra-draw-openlayers-adapter/src/terra-draw-openlayers-adapter";
@@ -59,6 +60,7 @@ export const initialiseOpenLayersMap = ({
 			Projection,
 			fromLonLat,
 			toLonLat,
+			Icon,
 		},
 		map,
 	};
@@ -72,9 +74,9 @@ export function SetupOpenLayers(args: StoryArgs): HTMLElement {
 	}
 
 	const { container, controls, mapContainer, modeButtons, clearButton, modes } =
-		setupMapContainer(args);
+		setupMapContainer({ ...args, adapter: "openlayers" });
 
-	onNextFrame(() => {
+	whenElementExists(`#${mapContainer.id}`, () => {
 		const mapConfig = initialiseOpenLayersMap({
 			mapContainer,
 			centerLat: args.centerLat,
@@ -89,6 +91,7 @@ export function SetupOpenLayers(args: StoryArgs): HTMLElement {
 					...mapConfig,
 				}),
 				modes,
+				undoRedo: SetupUndoRedo(args),
 			});
 
 			draw.start();

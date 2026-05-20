@@ -3895,7 +3895,7 @@ describe("TerraDrawSelectMode", () => {
 		});
 	});
 
-	// Fork regression tests: pointerOverSelectionPoint cursor and pointerDistance/2 threshold
+	// Fork regression tests: pointerOverCoordinate cursor and pointerDistance/2 threshold
 	describe("fork: onMouseMove cursor behaviour", () => {
 		// Mock project multiplies by 40: project(lng, lat) => {x: lng*40, y: lat*40}
 		// pointerDistance=20 makes the threshold pointerDistance/2=10px.
@@ -3908,7 +3908,7 @@ describe("TerraDrawSelectMode", () => {
 			const mode = new TerraDrawSelectMode({
 				pointerDistance: 20,
 				flags: { polygon: { feature: { coordinates: { draggable: true } } } },
-				cursors: { pointerOverSelectionPoint: "grab" },
+				cursors: { pointerOverCoordinate: "grab" },
 			});
 			const config = MockModeConfig(mode.mode);
 			mode.register(config);
@@ -3939,8 +3939,8 @@ describe("TerraDrawSelectMode", () => {
 			return { mode, config };
 		};
 
-		describe("pointerOverSelectionPoint cursor option", () => {
-			it("sets the pointerOverSelectionPoint cursor when hovering within pointerDistance/2 of a polygon vertex", () => {
+		describe("pointerOverCoordinate cursor option", () => {
+			it("sets the pointerOverCoordinate cursor when hovering within pointerDistance/2 of a polygon vertex", () => {
 				const { mode, config } = createModeWithSelectionPoints();
 
 				// 8px from vertex [0,0] — within threshold (10px)
@@ -3949,7 +3949,7 @@ describe("TerraDrawSelectMode", () => {
 				expect(config.setCursor).toHaveBeenCalledWith("grab");
 			});
 
-			it("does not set pointerOverSelectionPoint cursor when hovering beyond pointerDistance/2 but within pointerDistance", () => {
+			it("does not set pointerOverCoordinate cursor when hovering beyond pointerDistance/2 but within pointerDistance", () => {
 				const { mode, config } = createModeWithSelectionPoints();
 
 				// 16px from vertex [0,0] — beyond fork threshold (10px) but within upstream threshold (20px)

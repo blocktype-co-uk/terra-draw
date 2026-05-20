@@ -128,7 +128,6 @@ type SelectionStyling = {
 };
 
 interface Cursors {
-	pointerOverSelectionPoint?: Cursor;
 	pointerOver?: Cursor;
 	pointerOverFeature?: Cursor;
 	pointerOverCoordinate?: Cursor;
@@ -139,10 +138,6 @@ interface Cursors {
 }
 
 const defaultCursors = {
-	// pointerOverSelectionPoint intentionally omitted from defaults:
-	// it is a fork-specific alias for pointerOverCoordinate kept for backward compatibility.
-	// It is only used when explicitly provided by the caller; otherwise the chain falls
-	// through to pointerOver.  See getPointerOverCoordinateCursor().
 	pointerOver: "move",
 	dragStart: "move",
 	dragEnd: "move",
@@ -206,12 +201,7 @@ export class TerraDrawSelectMode extends TerraDrawBaseSelectMode<SelectionStylin
 	}
 
 	private getPointerOverCoordinateCursor() {
-		// pointerOverSelectionPoint is a fork-specific alias kept for backward compatibility
-		return (
-			this.cursors.pointerOverCoordinate ??
-			this.cursors.pointerOverSelectionPoint ??
-			this.cursors.pointerOver
-		);
+		return this.cursors.pointerOverCoordinate ?? this.cursors.pointerOver;
 	}
 
 	private getPointerOverResizeHandleCursor() {

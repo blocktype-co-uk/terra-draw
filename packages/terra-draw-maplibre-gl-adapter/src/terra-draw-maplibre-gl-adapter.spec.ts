@@ -225,6 +225,29 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 				expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
 			});
 		});
+
+		describe("lazy re-snapshot: adapts to state change between construction and first setDraggability(false)", () => {
+			it("does not re-enable dragPan if external code disabled it after adapter construction", () => {
+				const map = createMapLibreGLMap();
+				// At construction time: dragPan.isEnabled() returns true (default mock)
+				const adapter = new TerraDrawMapLibreGLAdapter({
+					map: map as maplibregl.Map,
+				});
+
+				// External code disables dragPan AFTER construction but before Terra Draw takes over
+				map.dragPan!.isEnabled = jest.fn(() => false);
+
+				// Terra Draw disables dragging — must snapshot current state (disabled)
+				adapter.setDraggability(false);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+
+				// Terra Draw re-enables — must NOT re-enable dragPan because snapshot captured it as disabled
+				// (This differs from an eager constructor-time capture which would have seen it as enabled)
+				adapter.setDraggability(true);
+				expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+			});
+		});
 	});
 
 	describe("project", () => {

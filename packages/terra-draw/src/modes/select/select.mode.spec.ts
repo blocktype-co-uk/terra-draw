@@ -3190,4 +3190,70 @@ describe("TerraDrawSelectMode", () => {
 			);
 		});
 	});
+
+	// Fork regression tests: pointerOverSelectionPoint cursor and pointerDistance/2 threshold
+	describe("fork: onMouseMove cursor behaviour", () => {
+		// Mock project multiplies by 40: project(lng, lat) => {x: lng*40, y: lat*40}
+		// pointerDistance=20 makes the threshold pointerDistance/2=10px.
+		// Selection point at [0,0] → pixel {x:0, y:0}.
+		// Mouse at lng=0.2 → pixel {x:8} → distance 8px  < 10 → within threshold.
+		// Mouse at lng=0.4 → pixel {x:16} → distance 16px > 10 → outside threshold
+		//   but within upstream threshold (20px), so the test would fail if / 2 is removed.
+
+		const createModeWithSelectionPoints = () => {
+			const mode = new TerraDrawSelectMode({
+				pointerDistance: 20,
+				flags: { polygon: { feature: { coordinates: { draggable: true } } } },
+				cursors: { pointerOverSelectionPoint: "grab" },
+			});
+			const config = MockModeConfig(mode.mode);
+			mode.register(config);
+
+			// Add and select a polygon so selection points are created at its vertices
+			config.store.create([
+				{
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							[
+								[0, 0],
+								[0, 1],
+								[1, 1],
+								[1, 0],
+								[0, 0],
+							],
+						],
+					},
+					properties: { mode: "polygon" },
+				},
+			]);
+
+			mode.onClick(MockCursorEvent({ lng: 0.5, lat: 0.5 }));
+			expect(config.onSelect).toHaveBeenCalledTimes(1);
+			config.setCursor.mockClear();
+
+			return { mode, config };
+		};
+
+		describe("pointerOverSelectionPoint cursor option", () => {
+			it("sets the pointerOverSelectionPoint cursor when hovering within pointerDistance/2 of a polygon vertex", () => {
+				const { mode, config } = createModeWithSelectionPoints();
+
+				// 8px from vertex [0,0] — within threshold (10px)
+				mode.onMouseMove(MockCursorEvent({ lng: 0.2, lat: 0 }));
+
+				expect(config.setCursor).toHaveBeenCalledWith("grab");
+			});
+
+			it("does not set pointerOverSelectionPoint cursor when hovering beyond pointerDistance/2 but within pointerDistance", () => {
+				const { mode, config } = createModeWithSelectionPoints();
+
+				// 16px from vertex [0,0] — beyond fork threshold (10px) but within upstream threshold (20px)
+				// This assertion catches the regression if the / 2 divisor is removed
+				mode.onMouseMove(MockCursorEvent({ lng: 0.4, lat: 0 }));
+
+				expect(config.setCursor).not.toHaveBeenCalledWith("grab");
+			});
+		});
+	});
 });

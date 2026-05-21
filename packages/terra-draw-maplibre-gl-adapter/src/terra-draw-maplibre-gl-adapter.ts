@@ -18,9 +18,9 @@ import {
 } from "maplibre-gl";
 import { Feature, LineString, Point, Polygon } from "geojson";
 
-export class TerraDrawMapLibreGLAdapter<
-	MapType,
-> extends TerraDrawExtend.TerraDrawBaseAdapter {
+export class TerraDrawMapLibreGLAdapter<MapType>
+	extends TerraDrawExtend.TerraDrawBaseAdapter
+{
 	constructor(
 		config: {
 			map: MapType;
@@ -692,17 +692,34 @@ export class TerraDrawMapLibreGLAdapter<
 			[] as Feature<Point>[],
 		);
 
-		if (this._renderPointsBeforeLayerId) {
-			this._map.moveLayer(pointId, this._renderPointsBeforeLayerId);
-		}
+		const singleTarget =
+			this._renderPointsBeforeLayerId !== undefined &&
+			this._renderPointsBeforeLayerId === this._renderLinesBeforeLayerId &&
+			this._renderPointsBeforeLayerId === this._renderPolygonsBeforeLayerId;
 
-		if (this._renderLinesBeforeLayerId) {
-			this._map.moveLayer(lineStringId, this._renderLinesBeforeLayerId);
+		if (singleTarget) {
+			// default terra-draw behaviour
+			const target = this._renderPointsBeforeLayerId!;
+			this._map.moveLayer(pointId, target);
+			this._map.moveLayer(pointId + "-marker", target);
+			this._map.moveLayer(lineStringId, pointId);
 			this._map.moveLayer(polygonStringId + "-outline", lineStringId);
-		}
+			this._map.moveLayer(polygonStringId, lineStringId);
+		} else {
+			// custom per-layer handling in the fork
+			if (this._renderPointsBeforeLayerId) {
+				this._map.moveLayer(pointId, this._renderPointsBeforeLayerId);
+				this._map.moveLayer(pointId + "-marker", pointId);
+			}
 
-		if (this._renderPolygonsBeforeLayerId) {
-			this._map.moveLayer(polygonStringId, this._renderPolygonsBeforeLayerId);
+			if (this._renderLinesBeforeLayerId) {
+				this._map.moveLayer(lineStringId, this._renderLinesBeforeLayerId);
+				this._map.moveLayer(polygonStringId + "-outline", lineStringId);
+			}
+
+			if (this._renderPolygonsBeforeLayerId) {
+				this._map.moveLayer(polygonStringId, this._renderPolygonsBeforeLayerId);
+			}
 		}
 
 		// console.log('image added', image.data)

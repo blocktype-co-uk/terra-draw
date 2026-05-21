@@ -810,14 +810,16 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 
 			adapter.register(MockCallbacks());
 
-			expect(map.moveLayer).toHaveBeenCalledTimes(4);
+			// td-point-marker travels with td-point to the same target
+			expect(map.moveLayer).toHaveBeenCalledTimes(5);
+			expect(map.moveLayer).toHaveBeenCalledWith("td-point", "101");
+			expect(map.moveLayer).toHaveBeenCalledWith("td-point-marker", "td-point");
+			expect(map.moveLayer).toHaveBeenCalledWith("td-linestring", "102");
 			expect(map.moveLayer).toHaveBeenCalledWith(
 				"td-polygon-outline",
 				"td-linestring",
 			);
 			expect(map.moveLayer).toHaveBeenCalledWith("td-polygon", "103");
-			expect(map.moveLayer).toHaveBeenCalledWith("td-linestring", "102");
-			expect(map.moveLayer).toHaveBeenCalledWith("td-point", "101");
 		});
 
 		it("reorders all layers before renderBelowLayerId when only that option is set", () => {
@@ -831,14 +833,22 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 
 			adapter.register(MockCallbacks());
 
-			expect(map.moveLayer).toHaveBeenCalledTimes(4);
+			// Compact chain — all layers stacked just below mock-layer in the correct
+			// order (bottom→top): polygon, linestring, point, point-marker, mock-layer.
+			// td-point and td-point-marker both go just below mock-layer first, then the
+			// chain builds downward so nothing floats above the wrong layer.
+			expect(map.moveLayer).toHaveBeenCalledTimes(5);
 			expect(map.moveLayer).toHaveBeenCalledWith("td-point", "mock-layer");
-			expect(map.moveLayer).toHaveBeenCalledWith("td-linestring", "mock-layer");
+			expect(map.moveLayer).toHaveBeenCalledWith(
+				"td-point-marker",
+				"mock-layer",
+			);
+			expect(map.moveLayer).toHaveBeenCalledWith("td-linestring", "td-point");
 			expect(map.moveLayer).toHaveBeenCalledWith(
 				"td-polygon-outline",
 				"td-linestring",
 			);
-			expect(map.moveLayer).toHaveBeenCalledWith("td-polygon", "mock-layer");
+			expect(map.moveLayer).toHaveBeenCalledWith("td-polygon", "td-linestring");
 		});
 	});
 });

@@ -61,7 +61,8 @@ export class TerraDrawTestAdapter extends TerraDrawBaseAdapter {
 			| "grabbing"
 			| "crosshair"
 			| "pointer"
-			| "wait",
+			| "wait"
+			| "default",
 	): ReturnType<SetCursor> {
 		// pass
 	}

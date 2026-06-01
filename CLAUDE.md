@@ -192,6 +192,23 @@ Keep `FORK_FEATURES.md` up to date.
 | TS error: `Cannot find name 'X'` after merge | Fork added code referencing a variable that upstream renamed/removed in the same hunk | Re-read the surrounding upstream context; the variable moved |
 | A `defaultCursors` entry silently swallows a fallback chain | A value in the defaults object was not meant to be a default | Remove from defaults; only apply when caller explicitly provides it |
 | `git stash push` fails on package-lock.json | Lock file has its own merge state | Stash it separately with an explicit path |
+| `npm run build` fails with `(babel plugin) SyntaxError: Unexpected token` on a `type` import in `terra-draw.ts` (or any first TS-only syntax), even though tsc passes | The error is a **red herring**. microbundle transpiles TS via `rollup-plugin-typescript2` (rpt2) *before* babel; babel has no TS parser. rpt2 picks files with a glob (`*.ts+(\|x)`) matched by `@rollup/pluginutils` → **picomatch**. After the merge's `npm install` (Rule 2), pluginutils got a nested `picomatch@2.3.2`, which regressed empty-branch extglobs like `+(\|x)`, so rpt2's filter matched **nothing**, passed raw `.ts` to babel, and babel choked. | Pin the good version: in root `package.json` add `"overrides": { "@rollup/pluginutils": { "picomatch": "2.3.1" } }`, then `npm install`. Verify: `node -e "console.log(require('@rollup/pluginutils/node_modules/picomatch/package.json').version)"` → `2.3.1`. Diagnose quickly by checking whether rpt2's filter excludes the entry (see below). |
+
+### Diagnosing "babel chokes on raw TS" (rpt2 filter excluded the file)
+
+If the build error is a babel parse error on valid TypeScript, rpt2 silently passed the file through unchanged. Confirm the filter is the problem:
+
+```bash
+node -e '
+const ts=require("typescript"), pu=require("@rollup/pluginutils"), path=require("path");
+const cwd=path.resolve("packages/terra-draw");
+const cfg=ts.parseJsonConfigFileContent(ts.readConfigFile(path.join(cwd,"tsconfig.json"),ts.sys.readFile).config,ts.sys,cwd);
+const filter=pu.createFilter(["*.ts+(|x)","**/*.ts+(|x)"],["*.d.ts","**/*.d.ts"],{resolve:cfg.options.rootDir});
+console.log("filter(entry) =", filter(path.join(cwd,"src/terra-draw.ts")));  // false = broken glob matcher
+'
+```
+
+`false` means the glob matcher (picomatch under `@rollup/pluginutils`) is broken — apply the override above. The mechanism: rpt2's `transform()` does `if (!filter(id)) return undefined;` (silent passthrough), so a bad matcher disables TS transpilation with no error of its own.
 
 ---
 

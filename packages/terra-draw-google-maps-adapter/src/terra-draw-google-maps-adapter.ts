@@ -11,7 +11,9 @@ import {
 
 import { GeoJsonObject } from "geojson";
 
-export class TerraDrawGoogleMapsAdapter extends TerraDrawExtend.TerraDrawBaseAdapter {
+export class TerraDrawGoogleMapsAdapter
+	extends TerraDrawExtend.TerraDrawBaseAdapter
+{
 	constructor(
 		config: {
 			lib: typeof google.maps;
@@ -463,7 +465,7 @@ export class TerraDrawGoogleMapsAdapter extends TerraDrawExtend.TerraDrawBaseAda
 	 */
 	public getMapEventElement(
 		eventType?: // TODO: Import TerraDrawHandledEvents - however is a breaking change currently
-		| "pointerdown"
+			| "pointerdown"
 			| "pointerup"
 			| "pointermove"
 			| "contextmenu"

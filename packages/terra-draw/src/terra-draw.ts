@@ -29,6 +29,7 @@ import {
 import { TerraDrawCircleMode } from "./modes/circle/circle.mode";
 import { TerraDrawFreehandMode } from "./modes/freehand/freehand.mode";
 import { TerraDrawLineStringMode } from "./modes/linestring/linestring.mode";
+import { TerraDrawPolyLineMode } from "./modes/polyline/polyline.mode";
 import { TerraDrawPointMode } from "./modes/point/point.mode";
 import { TerraDrawPolygonMode } from "./modes/polygon/polygon.mode";
 import { TerraDrawRectangleMode } from "./modes/rectangle/rectangle.mode";
@@ -260,7 +261,7 @@ class TerraDraw {
 				listener(finishedId, context);
 			});
 
-			this.emitHistoryChangeAfterFinish();
+			this.undoRedoCoordinator?.emitHistoryPushForCompletedAction();
 		};
 
 		const onChange: StoreChangeHandler<TerraDrawOnChangeContext | undefined> = (
@@ -507,10 +508,6 @@ class TerraDraw {
 		}
 
 		this.drawingUndoRedo.emitPushIfHistoryChanged(before);
-	}
-
-	private emitHistoryChangeAfterFinish() {
-		this.undoRedoCoordinator?.emitPushAfterFinish();
 	}
 
 	private getModeStyles() {
@@ -797,9 +794,9 @@ class TerraDraw {
 	private isGuidanceFeature(feature: GeoJSONStoreFeatures): boolean {
 		return Boolean(
 			feature.properties[SELECT_PROPERTIES.MID_POINT] ||
-				feature.properties[SELECT_PROPERTIES.SELECTION_POINT] ||
-				feature.properties[COMMON_PROPERTIES.COORDINATE_POINT] ||
-				feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
+			feature.properties[SELECT_PROPERTIES.SELECTION_POINT] ||
+			feature.properties[COMMON_PROPERTIES.COORDINATE_POINT] ||
+			feature.properties[COMMON_PROPERTIES.SNAPPING_POINT],
 		);
 	}
 
@@ -1121,6 +1118,8 @@ class TerraDraw {
 			})),
 			{ origin: "api" }, // origin is used to indicate that this update has come from an API call
 		);
+
+		this.undoRedoCoordinator?.emitHistoryPushForCompletedAction();
 	}
 
 	/**
@@ -1189,6 +1188,8 @@ class TerraDraw {
 				selectModePresent.afterFeatureUpdated(updatedFeature);
 			}
 		}
+
+		this.undoRedoCoordinator?.emitHistoryPushForCompletedAction();
 	}
 
 	/**
@@ -1308,6 +1309,8 @@ class TerraDraw {
 				selectModePresent.afterFeatureUpdated(feature);
 			}
 		}
+
+		this.undoRedoCoordinator?.emitHistoryPushForCompletedAction();
 	}
 
 	undo(): boolean {
@@ -1578,6 +1581,7 @@ export {
 	TerraDrawSelectMode,
 	TerraDrawPointMode,
 	TerraDrawLineStringMode,
+	TerraDrawPolyLineMode,
 	TerraDrawPolygonMode,
 	TerraDrawCircleMode,
 	TerraDrawFreehandMode,

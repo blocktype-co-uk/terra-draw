@@ -7,9 +7,9 @@ import {
 	UpdateTypes,
 	COMMON_PROPERTIES,
 	Z_INDEX,
+	FinishActions,
 } from "../../common";
 import {
-	BBoxPolygon,
 	FeatureId,
 	GeoJSONStoreFeatures,
 	StoreValidation,
@@ -18,18 +18,22 @@ import { getDefaultStyling } from "../../util/styling";
 import {
 	BaseModeOptions,
 	CustomStyling,
+	ModeUpdateOptions,
 	TerraDrawBaseDrawMode,
 } from "../base.mode";
 import { ValidatePointFeature } from "../../validations/point.validation";
-import { Point, Position } from "geojson";
 import { BehaviorConfig } from "../base.behavior";
 import { ClickBoundingBoxBehavior } from "../click-bounding-box.behavior";
 import { PixelDistanceBehavior } from "../pixel-distance.behavior";
+import { PointSearchBehavior } from "../point-search.behavior";
+import { MutateFeatureBehavior, Mutations } from "../mutate-feature.behavior";
 
 type PointModeStyling = {
 	pointWidth: NumericStyling;
 	pointColor: HexColorStyling;
+	pointOpacity: NumericStyling;
 	pointOutlineColor: HexColorStyling;
+	pointOutlineOpacity: NumericStyling;
 	pointOutlineWidth: NumericStyling;
 	editedPointColor: HexColorStyling;
 	editedPointWidth: NumericStyling;
@@ -49,14 +53,15 @@ const defaultCursors = {
 	dragEnd: "crosshair",
 } as Required<Cursors>;
 
-interface TerraDrawPointModeOptions<T extends CustomStyling>
-	extends BaseModeOptions<T> {
+interface TerraDrawPointModeOptions<
+	T extends CustomStyling,
+> extends BaseModeOptions<T> {
 	cursors?: Cursors;
 	editable?: boolean;
 }
 
 export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> {
-	mode = "point" as const;
+	mode = "point";
 
 	// Options
 	private cursors: Required<Cursors> = defaultCursors;
@@ -68,6 +73,8 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 	// Behaviors
 	private pixelDistance!: PixelDistanceBehavior;
 	private clickBoundingBox!: ClickBoundingBoxBehavior;
+	private pointSearch!: PointSearchBehavior;
+	private mutateFeature!: MutateFeatureBehavior;
 
 	constructor(options?: TerraDrawPointModeOptions<PointModeStyling>) {
 		super(options, true);
@@ -75,7 +82,7 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 	}
 
 	updateOptions(
-		options?: TerraDrawPointModeOptions<PointModeStyling> | undefined,
+		options?: ModeUpdateOptions<TerraDrawPointModeOptions<PointModeStyling>>,
 	): void {
 		super.updateOptions(options);
 
@@ -143,7 +150,8 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 		}
 
 		if (this.editable) {
-			const nearestPointFeature = this.getNearestPointFeature(event);
+			const nearestPointFeature =
+				this.pointSearch.getNearestPointFeature(event);
 			this.editedFeatureId = nearestPointFeature?.id;
 		}
 
@@ -172,50 +180,17 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 			return;
 		}
 
-		const newGeometry = {
-			type: "Point",
-			coordinates: [event.lng, event.lat],
-		};
-
-		if (this.validate) {
-			const validationResult = this.validate(
-				{
-					type: "Feature",
-					geometry: newGeometry,
-					properties: this.store.getPropertiesCopy(this.editedFeatureId),
-				} as GeoJSONStoreFeatures,
-				{
-					project: this.project,
-					unproject: this.unproject,
-					coordinatePrecision: this.coordinatePrecision,
-					updateType: UpdateTypes.Finish,
-				},
-			);
-
-			if (!validationResult.valid) {
-				return;
-			}
-		}
-
-		// For cursor points we can simply move it
-		// to the dragged position
-		this.store.updateGeometry([
-			{
-				id: this.editedFeatureId,
-				geometry: {
-					type: "Point",
-					coordinates: [event.lng, event.lat],
-				},
+		this.mutateFeature.updatePoint({
+			featureId: this.editedFeatureId,
+			coordinateMutations: {
+				type: Mutations.Replace,
+				coordinates: [event.lng, event.lat],
 			},
-		]);
-
-		this.store.updateProperty([
-			{
-				id: this.editedFeatureId,
-				property: COMMON_PROPERTIES.EDITED,
-				value: true,
+			propertyMutations: {
+				[COMMON_PROPERTIES.EDITED]: true,
 			},
-		]);
+			context: { updateType: UpdateTypes.Provisional },
+		});
 	}
 
 	/** @internal */
@@ -231,24 +206,42 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 			return;
 		}
 
-		this.onFinish(this.editedFeatureId, { mode: this.mode, action: "edit" });
+		const updated = this.mutateFeature.updatePoint({
+			featureId: this.editedFeatureId,
+			propertyMutations: {
+				mode: this.mode,
+				[COMMON_PROPERTIES.EDITED]: false,
+			},
+			context: { updateType: UpdateTypes.Finish, action: "edit" },
+		});
+
+		if (!updated) {
+			return;
+		}
+
+		const featureId = this.editedFeatureId;
 
 		this.setCursor(this.cursors.dragEnd);
-
-		this.store.updateProperty([
-			{
-				id: this.editedFeatureId,
-				property: COMMON_PROPERTIES.EDITED,
-				value: false,
-			},
-		]);
 		this.editedFeatureId = undefined;
 		setMapDraggability(true);
+
+		this.onFinish(featureId, {
+			mode: this.mode,
+			action: FinishActions.Draw,
+		});
 	}
 
 	registerBehaviors(config: BehaviorConfig) {
 		this.pixelDistance = new PixelDistanceBehavior(config);
 		this.clickBoundingBox = new ClickBoundingBoxBehavior(config);
+		this.pointSearch = new PointSearchBehavior(
+			config,
+			this.pixelDistance,
+			this.clickBoundingBox,
+		);
+		this.mutateFeature = new MutateFeatureBehavior(config, {
+			validate: this.validate,
+		});
 	}
 
 	/** @internal */
@@ -270,6 +263,12 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 				feature,
 			);
 
+			styles.pointOpacity = this.getNumericStylingValue(
+				this.styles.pointOpacity,
+				styles.pointOpacity === undefined ? 1 : styles.pointOpacity,
+				feature,
+			);
+
 			styles.pointColor = this.getHexColorStylingValue(
 				isEdited ? this.styles.editedPointColor : this.styles.pointColor,
 				styles.pointColor,
@@ -281,6 +280,14 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 					? this.styles.editedPointOutlineColor
 					: this.styles.pointOutlineColor,
 				styles.pointOutlineColor,
+				feature,
+			);
+
+			styles.pointOutlineOpacity = this.getNumericStylingValue(
+				this.styles.pointOutlineOpacity,
+				styles.pointOutlineOpacity === undefined
+					? 1
+					: styles.pointOutlineOpacity,
 				feature,
 			);
 
@@ -305,37 +312,20 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 	}
 
 	private onLeftClick(event: TerraDrawMouseEvent) {
-		const geometry = {
-			type: "Point",
+		const feature = this.mutateFeature.createPoint({
 			coordinates: [event.lng, event.lat],
-		} as Point;
+			properties: {
+				mode: this.mode,
+			},
+			context: { updateType: UpdateTypes.Finish, action: FinishActions.Draw },
+		});
 
-		const properties = { mode: this.mode };
-
-		if (this.validate) {
-			const validationResult = this.validate(
-				{
-					type: "Feature",
-					geometry,
-					properties,
-				} as GeoJSONStoreFeatures,
-				{
-					project: this.project,
-					unproject: this.unproject,
-					coordinatePrecision: this.coordinatePrecision,
-					updateType: UpdateTypes.Finish,
-				},
-			);
-
-			if (!validationResult.valid) {
-				return;
-			}
+		if (feature) {
+			this.onFinish(feature.id, {
+				mode: this.mode,
+				action: FinishActions.Draw,
+			});
 		}
-
-		const [pointId] = this.store.create([{ geometry, properties }]);
-
-		// Ensure that any listerers are triggered with the main created geometry
-		this.onFinish(pointId, { mode: this.mode, action: "draw" });
 	}
 
 	private onRightClick(event: TerraDrawMouseEvent) {
@@ -344,45 +334,11 @@ export class TerraDrawPointMode extends TerraDrawBaseDrawMode<PointModeStyling> 
 			return;
 		}
 
-		const clickedFeature = this.getNearestPointFeature(event);
+		const clickedFeature = this.pointSearch.getNearestPointFeature(event);
 
 		if (clickedFeature) {
-			this.store.delete([clickedFeature.id as FeatureId]);
+			this.mutateFeature.deleteFeatureIfPresent(clickedFeature.id as FeatureId);
 		}
-	}
-
-	private getNearestPointFeature(event: TerraDrawMouseEvent) {
-		const bbox = this.clickBoundingBox.create(event) as BBoxPolygon;
-		const features = this.store.search(bbox);
-
-		let distance = Infinity;
-		let clickedFeature: GeoJSONStoreFeatures | undefined = undefined;
-
-		for (let i = 0; i < features.length; i++) {
-			const feature = features[i];
-			const isPoint =
-				feature.geometry.type === "Point" &&
-				feature.properties.mode === this.mode;
-
-			if (!isPoint) {
-				continue;
-			}
-
-			const position = feature.geometry.coordinates as Position;
-			const distanceToFeature = this.pixelDistance.measure(event, position);
-
-			if (
-				distanceToFeature > distance ||
-				distanceToFeature > this.pointerDistance
-			) {
-				continue;
-			}
-
-			distance = distanceToFeature;
-			clickedFeature = feature;
-		}
-
-		return clickedFeature;
 	}
 
 	afterFeatureUpdated(feature: GeoJSONStoreFeatures) {

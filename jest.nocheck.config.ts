@@ -1,7 +1,9 @@
-// eslint-disable-next-line no-console
-console.log("===== Using @swc/jest ======");
+/* eslint-disable no-console */
 
-module.exports = {
+console.log("Loading Jest configuration...");
+console.log("Using ts-jest");
+
+export default {
 	transform: {
 		"^.+\\.(t|j)sx?$": "@swc/jest",
 	},

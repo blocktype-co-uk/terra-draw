@@ -128,7 +128,7 @@ describe("GeoJSONStore", () => {
 				{ geometry: { type: "Point", coordinates: [0, 0] } },
 			]);
 
-			store.clear();
+			store.clear({ origin: "api" });
 
 			expect(store.size()).toBe(0);
 
@@ -263,10 +263,14 @@ describe("GeoJSONStore", () => {
 	describe("updateProperty", () => {
 		it("updates geometry", () => {
 			const store = new GeoJSONStore();
+			const mockCallback = jest.fn();
+			store.registerOnChange(mockCallback);
 
 			const [id] = store.create<string>([
 				{ geometry: { type: "Point", coordinates: [0, 0] } },
 			]);
+
+			mockCallback.mockClear();
 
 			store.updateProperty([{ id, property: "test", value: 1 }]);
 
@@ -274,6 +278,30 @@ describe("GeoJSONStore", () => {
 				test: 1,
 				createdAt: expect.any(Number),
 				updatedAt: expect.any(Number),
+			});
+
+			expect(mockCallback).toHaveBeenCalledTimes(1);
+			expect(mockCallback).toHaveBeenCalledWith([id], "update", {
+				target: "properties",
+			});
+		});
+
+		it("does not call onChange if property value is identical", () => {
+			const store = new GeoJSONStore();
+			const mockCallback = jest.fn();
+			store.registerOnChange(mockCallback);
+
+			const [id] = store.create<string>([
+				{ geometry: { type: "Point", coordinates: [0, 0] } },
+			]);
+			mockCallback.mockClear();
+
+			store.updateProperty([{ id, property: "test", value: 1 }]);
+			store.updateProperty([{ id, property: "test", value: 1 }]); // identical value
+
+			expect(mockCallback).toHaveBeenCalledTimes(1); // only called for create and first update
+			expect(mockCallback).toHaveBeenCalledWith([id], "update", {
+				target: "properties",
 			});
 		});
 
@@ -316,12 +344,9 @@ describe("GeoJSONStore", () => {
 				"create",
 				undefined,
 			);
-			expect(mockCallback).toHaveBeenNthCalledWith(
-				2,
-				[id],
-				"update",
-				undefined,
-			);
+			expect(mockCallback).toHaveBeenNthCalledWith(2, [id], "update", {
+				target: "geometry",
+			});
 			expect(mockCallback).toHaveBeenNthCalledWith(
 				3,
 				[id],
@@ -422,9 +447,9 @@ describe("GeoJSONStore", () => {
 				(feature) => ({
 					valid: Boolean(
 						feature &&
-							typeof feature === "object" &&
-							"type" in feature &&
-							feature.type === "Polygon",
+						typeof feature === "object" &&
+						"type" in feature &&
+						feature.type === "Polygon",
 					),
 					reason: "Test",
 				}),
@@ -512,9 +537,9 @@ describe("GeoJSONStore", () => {
 				(feature) => ({
 					valid: Boolean(
 						feature &&
-							typeof feature === "object" &&
-							"type" in feature &&
-							(feature as GeoJSONStoreFeatures).geometry.type === "Point",
+						typeof feature === "object" &&
+						"type" in feature &&
+						(feature as GeoJSONStoreFeatures).geometry.type === "Point",
 					),
 				}),
 			);
@@ -577,9 +602,9 @@ describe("GeoJSONStore", () => {
 				(feature) => ({
 					valid: Boolean(
 						feature &&
-							typeof feature === "object" &&
-							"type" in feature &&
-							(feature as GeoJSONStoreFeatures).geometry.type === "Point", // Must be Point to be valid
+						typeof feature === "object" &&
+						"type" in feature &&
+						(feature as GeoJSONStoreFeatures).geometry.type === "Point", // Must be Point to be valid
 					),
 					reason: "Feature must be valid Point",
 				}),
@@ -628,9 +653,9 @@ describe("GeoJSONStore", () => {
 				(feature) => ({
 					valid: Boolean(
 						feature &&
-							typeof feature === "object" &&
-							"type" in feature &&
-							(feature as GeoJSONStoreFeatures).geometry.type === "Point",
+						typeof feature === "object" &&
+						"type" in feature &&
+						(feature as GeoJSONStoreFeatures).geometry.type === "Point",
 					),
 				}),
 				afterFeatureAddedMock,
@@ -710,9 +735,9 @@ describe("GeoJSONStore", () => {
 				(feature) => ({
 					valid: Boolean(
 						feature &&
-							typeof feature === "object" &&
-							"type" in feature &&
-							(feature as GeoJSONStoreFeatures).geometry.type === "Point", // Must be Point to be valid
+						typeof feature === "object" &&
+						"type" in feature &&
+						(feature as GeoJSONStoreFeatures).geometry.type === "Point", // Must be Point to be valid
 					),
 					reason: "Feature must be valid Point",
 				}),

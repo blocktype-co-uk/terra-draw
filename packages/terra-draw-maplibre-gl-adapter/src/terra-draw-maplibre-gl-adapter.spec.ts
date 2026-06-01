@@ -2,7 +2,14 @@
  * @jest-environment jsdom
  */
 import { TerraDrawAdapterStyling, TerraDrawExtend } from "terra-draw";
+
+import { TextDecoder, TextEncoder } from "util";
+global.TextDecoder = TextDecoder as typeof global.TextDecoder;
+global.TextEncoder = TextEncoder as typeof global.TextEncoder;
+global.URL.createObjectURL = jest.fn();
+
 import { TerraDrawMapLibreGLAdapter } from "./terra-draw-maplibre-gl-adapter";
+
 import * as maplibregl from "maplibre-gl";
 
 describe("TerraDrawMapLibreGLAdapter", () => {
@@ -225,6 +232,29 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 				expect(map.dragRotate?.disable).toHaveBeenCalledTimes(0);
 			});
 		});
+
+		describe("lazy re-snapshot: adapts to state change between construction and first setDraggability(false)", () => {
+			it("does not re-enable dragPan if external code disabled it after adapter construction", () => {
+				const map = createMapLibreGLMap();
+				// At construction time: dragPan.isEnabled() returns true (default mock)
+				const adapter = new TerraDrawMapLibreGLAdapter({
+					map: map as maplibregl.Map,
+				});
+
+				// External code disables dragPan AFTER construction but before Terra Draw takes over
+				map.dragPan!.isEnabled = jest.fn(() => false);
+
+				// Terra Draw disables dragging — must snapshot current state (disabled)
+				adapter.setDraggability(false);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+
+				// Terra Draw re-enables — must NOT re-enable dragPan because snapshot captured it as disabled
+				// (This differs from an eager constructor-time capture which would have seen it as enabled)
+				adapter.setDraggability(true);
+				expect(map.dragPan?.enable).toHaveBeenCalledTimes(0);
+				expect(map.dragPan?.disable).toHaveBeenCalledTimes(1);
+			});
+		});
 	});
 
 	describe("project", () => {
@@ -348,7 +378,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			rAFCallback();
 
 			expect(map.addSource).toHaveBeenCalledTimes(3);
-			expect(map.addLayer).toHaveBeenCalledTimes(4);
+			expect(map.addLayer).toHaveBeenCalledTimes(5);
 			expect(map.getSource).toHaveBeenCalledTimes(3);
 
 			adapter.clear();
@@ -371,7 +401,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			adapter.register(MockCallbacks());
 
 			expect(map.addSource).toHaveBeenCalledTimes(3);
-			expect(map.addLayer).toHaveBeenCalledTimes(4);
+			expect(map.addLayer).toHaveBeenCalledTimes(5);
 
 			adapter.render(
 				{
@@ -390,7 +420,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			rAFCallback();
 
 			expect(map.addSource).toHaveBeenCalledTimes(3);
-			expect(map.addLayer).toHaveBeenCalledTimes(4);
+			expect(map.addLayer).toHaveBeenCalledTimes(5);
 		});
 
 		it("updates layers and sources when data is passed", () => {
@@ -407,7 +437,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			adapter.register(MockCallbacks());
 
 			expect(map.addSource).toHaveBeenCalledTimes(3);
-			expect(map.addLayer).toHaveBeenCalledTimes(4);
+			expect(map.addLayer).toHaveBeenCalledTimes(5);
 
 			expect(map.getSource).toHaveBeenCalledTimes(0);
 
@@ -429,7 +459,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 
 			// No additional sources or layers should be added
 			expect(map.addSource).toHaveBeenCalledTimes(3);
-			expect(map.addLayer).toHaveBeenCalledTimes(4);
+			expect(map.addLayer).toHaveBeenCalledTimes(5);
 
 			expect(map.getSource).toHaveBeenCalledTimes(3);
 
@@ -534,7 +564,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			adapter.register(MockCallbacks());
 
 			expect(map.addSource).toHaveBeenCalledTimes(3);
-			expect(map.addLayer).toHaveBeenCalledTimes(4);
+			expect(map.addLayer).toHaveBeenCalledTimes(5);
 
 			adapter.render(
 				{
@@ -553,7 +583,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			rAFCallback();
 
 			expect(map.addSource).toHaveBeenCalledTimes(3);
-			expect(map.addLayer).toHaveBeenCalledTimes(4);
+			expect(map.addLayer).toHaveBeenCalledTimes(5);
 
 			adapter.render(
 				{
@@ -620,7 +650,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 
 			adapter.unregister();
 
-			expect(map.removeLayer).toHaveBeenCalledTimes(4);
+			expect(map.removeLayer).toHaveBeenCalledTimes(5);
 			expect(map.removeSource).toHaveBeenCalledTimes(3);
 
 			// Clear updates the sources to empty
@@ -666,6 +696,56 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			deletedIds: [],
 		};
 
+		it("adds line-dasharray support when maplibre version is high enough", () => {
+			const map = createMapLibreGLMap();
+			(map as unknown as { version: string }).version = "5.8.0";
+
+			const adapter = new TerraDrawMapLibreGLAdapter({
+				map: map as maplibregl.Map,
+			});
+
+			adapter.register(MockCallbacks());
+
+			const lineLayerCall = (map.addLayer as jest.Mock).mock.calls.find(
+				([layer]) => (layer as { id?: string }).id === "td-linestring",
+			);
+
+			expect(lineLayerCall).toBeDefined();
+
+			const lineLayer = lineLayerCall?.[0] as {
+				paint?: { "line-dasharray"?: unknown };
+			};
+
+			expect(lineLayer.paint?.["line-dasharray"]).toEqual([
+				"coalesce",
+				["get", "lineStringDash"],
+				["literal", [1, 0]],
+			]);
+		});
+
+		it("does not add line-dasharray support when maplibre version is too low", () => {
+			const map = createMapLibreGLMap();
+			(map as unknown as { version: string }).version = "5.7.9";
+
+			const adapter = new TerraDrawMapLibreGLAdapter({
+				map: map as maplibregl.Map,
+			});
+
+			adapter.register(MockCallbacks());
+
+			const lineLayerCall = (map.addLayer as jest.Mock).mock.calls.find(
+				([layer]) => (layer as { id?: string }).id === "td-linestring",
+			);
+
+			expect(lineLayerCall).toBeDefined();
+
+			const lineLayer = lineLayerCall?.[0] as {
+				paint?: { "line-dasharray"?: unknown };
+			};
+
+			expect(lineLayer.paint?.["line-dasharray"]).toBeUndefined();
+		});
+
 		it("can register then unregister successfully", () => {
 			jest.spyOn(window, "requestAnimationFrame");
 
@@ -687,7 +767,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			adapter.unregister();
 
 			// Clears any set data
-			expect(map.removeLayer).toHaveBeenCalledTimes(4);
+			expect(map.removeLayer).toHaveBeenCalledTimes(5);
 			expect(map.removeSource).toHaveBeenCalledTimes(3);
 		});
 
@@ -712,14 +792,14 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 			adapter.unregister();
 
 			// Clears any set data
-			expect(map.removeLayer).toHaveBeenCalledTimes(4);
+			expect(map.removeLayer).toHaveBeenCalledTimes(5);
 			expect(map.removeSource).toHaveBeenCalledTimes(3);
 
 			// Re-register
 			adapter.register(MockCallbacks());
 		});
 
-		it("moves layers respecting the renderBelowLayerId properties", () => {
+		it("moves layers respecting per-layer renderBelowLayerId properties", () => {
 			const map = createMapLibreGLMap();
 			const adapter = new TerraDrawMapLibreGLAdapter({
 				map: map as maplibregl.Map,
@@ -730,14 +810,45 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 
 			adapter.register(MockCallbacks());
 
-			expect(map.moveLayer).toHaveBeenCalledTimes(4);
+			// td-point-marker travels with td-point to the same target
+			expect(map.moveLayer).toHaveBeenCalledTimes(5);
+			expect(map.moveLayer).toHaveBeenCalledWith("td-point", "101");
+			expect(map.moveLayer).toHaveBeenCalledWith("td-point-marker", "td-point");
+			expect(map.moveLayer).toHaveBeenCalledWith("td-linestring", "102");
 			expect(map.moveLayer).toHaveBeenCalledWith(
 				"td-polygon-outline",
 				"td-linestring",
 			);
 			expect(map.moveLayer).toHaveBeenCalledWith("td-polygon", "103");
-			expect(map.moveLayer).toHaveBeenCalledWith("td-linestring", "102");
-			expect(map.moveLayer).toHaveBeenCalledWith("td-point", "101");
+		});
+
+		it("reorders all layers before renderBelowLayerId when only that option is set", () => {
+			const map = createMapLibreGLMap();
+			const adapter = new TerraDrawMapLibreGLAdapter({
+				map: map as maplibregl.Map,
+				renderBelowLayerId: "mock-layer",
+			});
+
+			expect(map.moveLayer).toHaveBeenCalledTimes(0);
+
+			adapter.register(MockCallbacks());
+
+			// Compact chain — all layers stacked just below mock-layer in the correct
+			// order (bottom→top): polygon, linestring, point, point-marker, mock-layer.
+			// td-point and td-point-marker both go just below mock-layer first, then the
+			// chain builds downward so nothing floats above the wrong layer.
+			expect(map.moveLayer).toHaveBeenCalledTimes(5);
+			expect(map.moveLayer).toHaveBeenCalledWith("td-point", "mock-layer");
+			expect(map.moveLayer).toHaveBeenCalledWith(
+				"td-point-marker",
+				"mock-layer",
+			);
+			expect(map.moveLayer).toHaveBeenCalledWith("td-linestring", "td-point");
+			expect(map.moveLayer).toHaveBeenCalledWith(
+				"td-polygon-outline",
+				"td-linestring",
+			);
+			expect(map.moveLayer).toHaveBeenCalledWith("td-polygon", "td-linestring");
 		});
 	});
 });

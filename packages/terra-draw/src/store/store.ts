@@ -17,10 +17,9 @@ export type GeoJSONStoreGeometries = Polygon | LineString | Point;
 
 export type BBoxPolygon = Feature<Polygon, DefinedProperties>;
 
-export type GeoJSONStoreFeatures = Feature<
-	GeoJSONStoreGeometries,
-	DefinedProperties
->;
+export type GeoJSONStoreFeatures<
+	G extends GeoJSONStoreGeometries = GeoJSONStoreGeometries,
+> = Feature<G, DefinedProperties>;
 
 export type StoreValidation = {
 	id?: FeatureId;
@@ -51,8 +50,11 @@ export const defaultIdStrategy = {
 	isValidId: (id: FeatureId) => typeof id === "string" && id.length === 36,
 };
 
+const geometryContext: JSONObject = { target: "geometry" };
+const propertiesContext: JSONObject = { target: "properties" };
+
 export class GeoJSONStore<
-	OnChangeContext extends Record<string, JSON> | undefined,
+	OnChangeContext extends JSONObject | undefined,
 	Id extends FeatureId = FeatureId,
 > {
 	constructor(config?: GeoJSONStoreConfig<Id>) {
@@ -243,7 +245,7 @@ export class GeoJSONStore<
 		}[],
 		context?: OnChangeContext,
 	): void {
-		const ids: FeatureId[] = [];
+		const ids: Set<FeatureId> = new Set();
 		propertiesToUpdate.forEach(({ id, property, value }) => {
 			const feature = this.store[id];
 
@@ -253,7 +255,12 @@ export class GeoJSONStore<
 				);
 			}
 
-			ids.push(id);
+			if (feature.properties[property] === value) {
+				// If the value is the same, we don't need to update
+				return;
+			}
+
+			ids.add(id);
 
 			if (value === undefined) {
 				delete feature.properties[property];
@@ -267,8 +274,15 @@ export class GeoJSONStore<
 			}
 		});
 
-		if (this._onChange) {
-			this._onChange(ids, "update", context);
+		if (this._onChange && ids.size > 0) {
+			this._onChange(
+				// NOTE: We use Array.from to convert Set to Array because microbundle cannot handle spreading Sets
+				Array.from(ids),
+				"update",
+				context
+					? { ...context, ...propertiesContext }
+					: (propertiesContext as OnChangeContext),
+			);
 		}
 	}
 
@@ -276,9 +290,9 @@ export class GeoJSONStore<
 		geometriesToUpdate: { id: FeatureId; geometry: GeoJSONStoreGeometries }[],
 		context?: OnChangeContext,
 	): void {
-		const ids: FeatureId[] = [];
+		const ids: Set<FeatureId> = new Set();
 		geometriesToUpdate.forEach(({ id, geometry }) => {
-			ids.push(id);
+			ids.add(id);
 
 			const feature = this.store[id];
 
@@ -298,8 +312,15 @@ export class GeoJSONStore<
 			}
 		});
 
-		if (this._onChange) {
-			this._onChange(ids, "update", context);
+		if (this._onChange && ids.size > 0) {
+			this._onChange(
+				// NOTE: We use Array.from to convert Set to Array because microbundle cannot handle spreading Sets
+				Array.from(ids),
+				"update",
+				context
+					? { ...context, ...geometryContext }
+					: (geometryContext as OnChangeContext),
+			);
 		}
 	}
 
@@ -388,9 +409,11 @@ export class GeoJSONStore<
 		);
 	}
 
-	clear(): void {
+	clear(context: OnChangeContext): void {
+		const keys = Object.keys(this.store);
 		this.store = {};
 		this.spatialIndex.clear();
+		this._onChange(keys, "delete", context);
 	}
 
 	size(): number {

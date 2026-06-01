@@ -10,24 +10,35 @@ export type HexColor = `#${string}`;
 
 export type HexColorStyling =
 	| HexColor
-	| ((feature: GeoJSONStoreFeatures) => HexColor);
+	| ((feature: GeoJSONStoreFeatures) => HexColor | undefined);
 
 export type NumericStyling =
 	| number
-	| ((feature: GeoJSONStoreFeatures) => number);
+	| ((feature: GeoJSONStoreFeatures) => number | undefined);
+
+export type UrlStyling = string | ((feature: GeoJSONStoreFeatures) => string);
 
 export interface TerraDrawAdapterStyling {
 	pointColor: HexColor;
 	pointWidth: number;
+	pointOpacity?: number;
 	pointOutlineColor: HexColor;
+	pointOutlineOpacity?: number;
 	pointOutlineWidth: number;
 	polygonFillColor: HexColor;
 	polygonFillOpacity: number;
 	polygonOutlineColor: HexColor;
+	polygonOutlineOpacity?: number;
 	polygonOutlineWidth: number;
 	lineStringWidth: number;
 	lineStringColor: HexColor;
+	lineStringOpacity?: number;
+	/** lineStringDash - Tuple representing the dash pattern for the line string, where the first number is the length of the dash and the second number is the length of the gap in pixels */
+	lineStringDash?: [number, number];
 	zIndex: number;
+	markerUrl?: string;
+	markerHeight?: number;
+	markerWidth?: number;
 }
 
 export type CartesianPoint = { x: number; y: number };
@@ -76,12 +87,33 @@ export type GetLngLatFromEvent = (event: PointerEvent | MouseEvent) => {
 
 export type Projection = "web-mercator" | "globe";
 
-export type OnFinishContext = { mode: string; action: string };
+export const FinishActions = {
+	Draw: "draw",
+	Edit: "edit",
+	DeleteCoordinate: "deleteCoordinate",
+	InsertMidpoint: "insertMidpoint",
+	DragCoordinate: "dragCoordinate",
+	DragFeature: "dragFeature",
+	DragCoordinateResize: "dragCoordinateResize",
+} as const;
 
-export type OnChangeContext = { origin: "api" };
+export type DrawInteractions =
+	| "click-move"
+	| "click-drag"
+	| "click-move-or-drag";
+
+export type DrawType = "click" | "drag";
+
+export type Actions = (typeof FinishActions)[keyof typeof FinishActions];
+
+export type OnFinishContext = { mode: string; action: Actions };
+
+export type TerraDrawOnChangeContext =
+	| { origin: "api"; target?: "geometry" | "properties" }
+	| { target?: "geometry" | "properties" };
 
 export type TerraDrawGeoJSONStore = GeoJSONStore<
-	OnChangeContext | undefined,
+	TerraDrawOnChangeContext | undefined,
 	FeatureId
 >;
 
@@ -90,13 +122,14 @@ export interface TerraDrawModeRegisterConfig {
 	store: TerraDrawGeoJSONStore;
 	setDoubleClickToZoom: (enabled: boolean) => void;
 	setCursor: SetCursor;
-	onChange: StoreChangeHandler<OnChangeContext | undefined>;
+	onChange: StoreChangeHandler<TerraDrawOnChangeContext | undefined>;
 	onSelect: (selectedId: string) => void;
 	onDeselect: (deselectedId: string) => void;
 	onFinish: (finishedId: string, context: OnFinishContext) => void;
 	project: Project;
 	unproject: Unproject;
 	coordinatePrecision: number;
+	undoRedoMaxStackSize?: number;
 }
 
 export enum UpdateTypes {
@@ -176,19 +209,34 @@ export type TerraDrawStylingFunction = {
 	[mode: string]: (feature: GeoJSONStoreFeatures) => TerraDrawAdapterStyling;
 };
 
+export type TerraDrawHandledEvents = Extract<
+	keyof HTMLElementEventMap,
+	| "pointerdown"
+	| "pointerup"
+	| "pointermove"
+	| "contextmenu"
+	| "keyup"
+	| "keydown"
+>;
+
 export interface TerraDrawAdapter {
 	project: Project;
 	unproject: Unproject;
 	setCursor: SetCursor;
 	getLngLatFromEvent: GetLngLatFromEvent;
 	setDoubleClickToZoom: (enabled: boolean) => void;
-	getMapEventElement: () => HTMLElement;
+	getMapEventElement: (eventType?: TerraDrawHandledEvents) => HTMLElement;
 	register(callbacks: TerraDrawCallbacks): void;
 	unregister(): void;
 	render(changes: TerraDrawChanges, styling: TerraDrawStylingFunction): void;
 	clear(): void;
 	getCoordinatePrecision(): number;
 }
+
+const MARKER_URL_BASE =
+	"https://raw.githubusercontent.com/JamesLMilner/terra-draw/refs/heads/main/assets/markers";
+
+export const MARKER_URL_DEFAULT = `${MARKER_URL_BASE}/marker-blue.png`;
 
 export const SELECT_PROPERTIES = {
 	SELECTED: "selected",
@@ -208,7 +256,20 @@ export const COMMON_PROPERTIES = {
 	COORDINATE_POINT_IDS: "coordinatePointIds",
 	PROVISIONAL_COORDINATE_COUNT: "provisionalCoordinateCount",
 	COMMITTED_COORDINATE_COUNT: "committedCoordinateCount",
+	MARKER: "marker",
 } as const;
+
+const GUIDANCE_POINT_PROPERTY_KEYS = [
+	COMMON_PROPERTIES.EDITED,
+	SELECT_PROPERTIES.SELECTION_POINT,
+	SELECT_PROPERTIES.MID_POINT,
+	COMMON_PROPERTIES.CLOSING_POINT,
+	COMMON_PROPERTIES.SNAPPING_POINT,
+	COMMON_PROPERTIES.COORDINATE_POINT,
+];
+
+export type GuidancePointProperties =
+	(typeof GUIDANCE_POINT_PROPERTY_KEYS)[number];
 
 /**
  * Lower z-index represents layers that are lower in the stack

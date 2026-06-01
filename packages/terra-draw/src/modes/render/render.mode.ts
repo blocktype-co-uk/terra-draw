@@ -7,6 +7,7 @@ import {
 	BaseModeOptions,
 	CustomStyling,
 	ModeTypes,
+	ModeUpdateOptions,
 	TerraDrawBaseDrawMode,
 } from "../base.mode";
 import { BehaviorConfig } from "../base.behavior";
@@ -20,7 +21,9 @@ import { StoreValidation } from "../../store/store";
 type RenderModeStyling = {
 	pointColor: HexColorStyling;
 	pointWidth: NumericStyling;
+	pointOpacity: NumericStyling;
 	pointOutlineColor: HexColorStyling;
+	pointOutlineOpacity: NumericStyling;
 	pointOutlineWidth: NumericStyling;
 	polygonFillColor: HexColorStyling;
 	polygonFillOpacity: NumericStyling;
@@ -28,12 +31,13 @@ type RenderModeStyling = {
 	polygonOutlineWidth: NumericStyling;
 	lineStringWidth: NumericStyling;
 	lineStringColor: HexColorStyling;
+	lineStringOpacity: NumericStyling;
 	zIndex: NumericStyling;
 };
 
-interface TerraDrawRenderModeOptions<T extends CustomStyling>
-	extends BaseModeOptions<T> {
-	modeName?: string;
+interface TerraDrawRenderModeOptions<
+	T extends CustomStyling,
+> extends BaseModeOptions<T> {
 	// styles need to be there else we could fall back to BaseModeOptions
 	styles: Partial<T>;
 }
@@ -52,12 +56,9 @@ export class TerraDrawRenderMode extends TerraDrawBaseDrawMode<RenderModeStyling
 	}
 
 	updateOptions(
-		options?: TerraDrawRenderModeOptions<RenderModeStyling> | undefined,
+		options?: ModeUpdateOptions<TerraDrawRenderModeOptions<RenderModeStyling>>,
 	): void {
 		super.updateOptions(options);
-		if (options?.modeName) {
-			this.mode = options.modeName;
-		}
 	}
 
 	/** @internal */
@@ -118,6 +119,11 @@ export class TerraDrawRenderMode extends TerraDrawBaseDrawMode<RenderModeStyling
 				defaultStyles.pointWidth,
 				feature,
 			),
+			pointOpacity: this.getNumericStylingValue(
+				this.styles.pointOpacity,
+				defaultStyles.pointOpacity as number,
+				feature,
+			),
 			pointOutlineColor: this.getHexColorStylingValue(
 				this.styles.pointOutlineColor,
 				defaultStyles.pointOutlineColor,
@@ -126,6 +132,11 @@ export class TerraDrawRenderMode extends TerraDrawBaseDrawMode<RenderModeStyling
 			pointOutlineWidth: this.getNumericStylingValue(
 				this.styles.pointOutlineWidth,
 				defaultStyles.pointOutlineWidth,
+				feature,
+			),
+			pointOutlineOpacity: this.getNumericStylingValue(
+				this.styles.pointOutlineOpacity,
+				defaultStyles.pointOutlineOpacity as number,
 				feature,
 			),
 			polygonFillColor: this.getHexColorStylingValue(
@@ -158,11 +169,17 @@ export class TerraDrawRenderMode extends TerraDrawBaseDrawMode<RenderModeStyling
 				defaultStyles.lineStringColor,
 				feature,
 			),
+			lineStringOpacity: this.getNumericStylingValue(
+				this.styles.lineStringOpacity,
+				defaultStyles.lineStringOpacity as number,
+				feature,
+			),
 			zIndex: this.getNumericStylingValue(
 				this.styles.zIndex,
 				defaultStyles.zIndex,
 				feature,
 			),
+			lineStringDash: undefined,
 		};
 	}
 

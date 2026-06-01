@@ -44,6 +44,13 @@ describe("TerraDrawFreehandLineStringMode", () => {
 				keyEvents: { cancel: null, finish: null },
 			});
 		});
+
+		it("constructs with custom mode name", () => {
+			const freehandMode = new TerraDrawFreehandLineStringMode({
+				modeName: "custom",
+			});
+			expect(freehandMode.mode).toBe("custom");
+		});
 	});
 
 	describe("lifecycle", () => {
@@ -204,9 +211,16 @@ describe("TerraDrawFreehandLineStringMode", () => {
 			it("adds a linestring and closing point to store if registered", () => {
 				freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-				expect(onChange).toHaveBeenCalledTimes(1);
-				expect(onChange).toHaveBeenCalledWith(
-					[expect.any(String), expect.any(String)],
+				expect(onChange).toHaveBeenCalledTimes(2);
+				expect(onChange).toHaveBeenNthCalledWith(
+					1,
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					2,
+					[expect.any(String)],
 					"create",
 					undefined,
 				);
@@ -238,12 +252,7 @@ describe("TerraDrawFreehandLineStringMode", () => {
 					features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
 				).toBe(undefined);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
-				expect(onChange).toHaveBeenCalledWith(
-					[expect.any(String), expect.any(String)],
-					"create",
-					undefined,
-				);
+				expect(onChange).toHaveBeenCalledTimes(6);
 				expect(onFinish).toHaveBeenCalledTimes(1);
 			});
 
@@ -307,7 +316,6 @@ describe("TerraDrawFreehandLineStringMode", () => {
 				features = store.copyAll();
 				expect(features.length).toBe(2);
 
-				expect(onChange).toHaveBeenCalledTimes(2);
 				expect(onFinish).not.toHaveBeenCalled();
 			});
 
@@ -326,7 +334,6 @@ describe("TerraDrawFreehandLineStringMode", () => {
 				expect(features.length).toBe(1);
 				expect(features[0].geometry.type).toBe("LineString");
 
-				expect(onChange).toHaveBeenCalledTimes(3);
 				expect(onFinish).toHaveBeenCalledTimes(1);
 				expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
 					action: "draw",
@@ -356,15 +363,21 @@ describe("TerraDrawFreehandLineStringMode", () => {
 		it("updates the freehand linestring when the mouse cursor has moved a minimum amount", () => {
 			freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-			expect(onChange).toHaveBeenCalledTimes(1);
+			expect(onChange).toHaveBeenCalledTimes(2);
 			expect(onChange).toHaveBeenNthCalledWith(
 				1,
-				[expect.any(String), expect.any(String)],
+				[expect.any(String)],
+				"create",
+				undefined,
+			);
+			expect(onChange).toHaveBeenNthCalledWith(
+				2,
+				[expect.any(String)],
 				"create",
 				undefined,
 			);
 
-			const feature = store.copyAll()[0];
+			const [feature] = store.copyAll();
 
 			for (let i = 1; i < 6; i++) {
 				freehandMode.onMouseMove(
@@ -375,7 +388,7 @@ describe("TerraDrawFreehandLineStringMode", () => {
 				);
 			}
 
-			expect(onChange).toHaveBeenCalledTimes(11);
+			expect(onChange).toHaveBeenCalledTimes(12);
 
 			const updatedFeature = store.copyAll()[0];
 
@@ -414,9 +427,15 @@ describe("TerraDrawFreehandLineStringMode", () => {
 
 			freehandMode.cleanUp();
 
-			expect(onChange).toHaveBeenCalledTimes(3);
+			expect(onChange).toHaveBeenCalledTimes(4);
 			expect(onChange).toHaveBeenNthCalledWith(
-				2,
+				3,
+				[expect.any(String)],
+				"delete",
+				undefined,
+			);
+			expect(onChange).toHaveBeenNthCalledWith(
+				4,
 				[expect.any(String)],
 				"delete",
 				undefined,
@@ -484,6 +503,20 @@ describe("TerraDrawFreehandLineStringMode", () => {
 		describe("finish", () => {
 			it("finishes drawing linestring on finish key press", () => {
 				freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+				expect(onChange).toHaveBeenNthCalledWith(
+					1,
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					2,
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+
 				freehandMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 1 }));
 
 				let features = store.copyAll();
@@ -501,33 +534,28 @@ describe("TerraDrawFreehandLineStringMode", () => {
 					features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
 				).toBe(undefined);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
-				expect(onChange).toHaveBeenNthCalledWith(
-					1,
-					[expect.any(String), expect.any(String)],
-					"create",
-					undefined,
-				);
-				expect(onChange).toHaveBeenNthCalledWith(
-					2,
-					[expect.any(String)],
-					"update",
-					undefined,
-				);
+				expect(onChange).toHaveBeenCalledTimes(6);
+
 				expect(onChange).toHaveBeenNthCalledWith(
 					3,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
 				);
 				expect(onChange).toHaveBeenNthCalledWith(
 					4,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
 				);
 				expect(onChange).toHaveBeenNthCalledWith(
 					5,
+					[expect.any(String)],
+					"update",
+					{ target: "properties" },
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					6,
 					[expect.any(String)],
 					"delete",
 					undefined,
@@ -577,6 +605,8 @@ describe("TerraDrawFreehandLineStringMode", () => {
 				styles: {
 					lineStringColor: "#ffffff",
 					lineStringWidth: 2,
+					lineStringOpacity: 0.5,
+					lineStringDash: [5, 3],
 				},
 			});
 
@@ -589,6 +619,8 @@ describe("TerraDrawFreehandLineStringMode", () => {
 			).toMatchObject({
 				lineStringColor: "#ffffff",
 				lineStringWidth: 2,
+				lineStringOpacity: 0.5,
+				lineStringDash: [5, 3],
 			});
 		});
 
@@ -797,16 +829,22 @@ describe("TerraDrawFreehandLineStringMode", () => {
 
 			freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-			expect(mockConfig.onChange).toHaveBeenCalledTimes(1);
+			expect(mockConfig.onChange).toHaveBeenCalledTimes(2);
 			expect(mockConfig.onChange).toHaveBeenNthCalledWith(
 				1,
-				[expect.any(String), expect.any(String)],
+				[expect.any(String)],
+				"create",
+				undefined,
+			);
+			expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+				2,
+				[expect.any(String)],
 				"create",
 				undefined,
 			);
 
-			const freehandPolygonFeature = mockConfig.store.copyAll()[0];
-			const freehandClosingPointFeature = mockConfig.store.copyAll()[1];
+			const [freehandPolygonFeature, freehandClosingPointFeature] =
+				mockConfig.store.copyAll();
 
 			freehandMode.onMouseMove(
 				MockCursorEvent({

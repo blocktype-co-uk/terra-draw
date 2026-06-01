@@ -13,11 +13,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22.x"
+          node-version: "24.x"
       - name: Install Parent Folder
         run: npm ci
       - name: Run linting
@@ -26,11 +26,11 @@ jobs:
   unused:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22.x"
+          node-version: "24.x"
       - name: Install Parent Folder
         run: npm ci
       - name: Run unused code checking
@@ -39,11 +39,11 @@ jobs:
   storybook-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22.x"
+          node-version: "24.x"
       - name: Install Parent Folder
         run: npm ci
       - name: Build terra-draw
@@ -54,35 +54,32 @@ jobs:
   storybook-smoke-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22.x"
+          node-version: "24.x"
       - name: Install Parent Folder
         run: npm ci
       - name: Build terra-draw
         run: cd packages/terra-draw && npm run build
       - name: Install Playwright
         run: cd packages/storybook && npx playwright install
-      - name: Build Storybook
-        run: cd packages/storybook && npm run storybook:build
+        timeout-minutes: 10
+      - name: Run storybook smoke tests
+        run: cd packages/storybook && npm run storybook:test
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
-      - name: Run static Storybook build in the background
-        run: cd packages/storybook && npm run storybook:serve &
-      - name: Run storybook smoke tests
-        run: cd packages/storybook && npm run storybook:test
 
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22.x"
+          node-version: "24.x"
       - name: Install Parent Folder
         run: npm ci
       - name: Ensure no package-lock.json changes
@@ -105,11 +102,11 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Use Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22.x"
+          node-version: "24.x"
       - name: Install Parent Folder
         run: npm ci
       - name: Build terra-draw
@@ -123,10 +120,10 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
+    - uses: actions/checkout@v6
+    - uses: actions/setup-node@v6
       with:
-        node-version: "22.x"
+        node-version: "24.x"
     - name: Install parent directory
       run: npm ci
     - name: Build terra-draw
@@ -136,7 +133,7 @@ jobs:
     - name: Get installed Playwright version
       id: playwright-version
       working-directory: ./packages/e2e
-      run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').packages[''].devDependencies['@playwright/test'])")" >> $GITHUB_ENV
+      run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package.json').devDependencies['@playwright/test'])")" >> $GITHUB_ENV
     - name: Cache playwright binaries
       uses: actions/cache@v4
       id: playwright-cache
@@ -149,10 +146,27 @@ jobs:
       run: npm ci --ignore-scripts
     - run: npx playwright install --with-deps
       working-directory: ./packages/e2e
+      timeout-minutes: 10
       if: steps.playwright-cache.outputs.cache-hit != 'true'
     - run: npx playwright install-deps
       working-directory: ./packages/e2e
+      timeout-minutes: 10
       if: steps.playwright-cache.outputs.cache-hit != 'true'
     - name: Run Playwright tests
       working-directory: ./packages/e2e
       run: npm run test
+    
+  api-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Use Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+      - name: Install Parent Folder
+        run: npm ci
+      - name: Benchmark
+        run: cd packages/terra-draw && npm run benchmark
+        env:
+          CI: true

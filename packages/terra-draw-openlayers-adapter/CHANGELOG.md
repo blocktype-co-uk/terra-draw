@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.3.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-openlayers-adapter@1.2.0...terra-draw-openlayers-adapter@1.3.0) (2026-05-07)
+
+
+### feat
+
+* **terra-draw-openlayers-adapter:** add initial support for dashed lines (#885) ([](https://github.com/JamesLMilner/terra-draw/commit/83b12ae9031e7a9681b4168eccb22d0709a5b06d)), closes [#885](https://github.com/JamesLMilner/terra-draw/issues/885)
+
+
+### chore
+
+* **terra-draw-openlayers-adapter:** bump to ol 10.9.0 (#876) ([](https://github.com/JamesLMilner/terra-draw/commit/0a37849f778a80dcc928f6a560912dbc96c7ad58)), closes [#876](https://github.com/JamesLMilner/terra-draw/issues/876)
+
+## [1.2.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-openlayers-adapter@1.1.0...terra-draw-openlayers-adapter@1.2.0) (2026-02-01)
+
+
+### chore
+
+* **terra-draw-openlayers-adapter:** add support for polygon outline opacity (#799) ([](https://github.com/JamesLMilner/terra-draw/commit/09564e47c13ad317c0dba654b85d109ffaa3f442)), closes [#799](https://github.com/JamesLMilner/terra-draw/issues/799)
+
+
+### feat
+
+* **terra-draw-openlayers-adapter:** add support for point and linestring opacity (#791) ([](https://github.com/JamesLMilner/terra-draw/commit/d025e7c09f04f5412ba32b8d459d0d9a3cdf2ccf)), closes [#791](https://github.com/JamesLMilner/terra-draw/issues/791)
+
+## [1.1.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-openlayers-adapter@1.0.1...terra-draw-openlayers-adapter@1.1.0) (2025-10-12)
+
+
+### feat
+
+* **terra-draw-openlayers-adapter:** add support for markers (#675) ([](https://github.com/JamesLMilner/terra-draw/commit/f45ad44d88160087f5ff320ab9ba590970925e78)), closes [#675](https://github.com/JamesLMilner/terra-draw/issues/675)
+
 ## [1.0.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-openlayers-adapter@1.0.0...terra-draw-openlayers-adapter@1.0.1) (2025-07-26)
 
 

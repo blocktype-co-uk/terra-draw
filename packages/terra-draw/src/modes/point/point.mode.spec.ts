@@ -5,6 +5,7 @@ import { MockCursorEvent } from "../../test/mock-cursor-event";
 import { DefaultPointerEvents } from "../base.mode";
 import { MockPoint } from "../../test/mock-features";
 import { GeoJSONStoreFeatures, JSONObject } from "../../store/store";
+import { COMMON_PROPERTIES } from "../../common";
 
 describe("TerraDrawPointMode", () => {
 	describe("constructor", () => {
@@ -27,6 +28,11 @@ describe("TerraDrawPointMode", () => {
 			expect(pointMode.styles).toStrictEqual({
 				pointOutlineColor: "#ffffff",
 			});
+		});
+
+		it("constructs with custom mode name", () => {
+			const pointMode = new TerraDrawPointMode({ modeName: "custom" });
+			expect(pointMode.mode).toBe("custom");
 		});
 	});
 
@@ -158,6 +164,20 @@ describe("TerraDrawPointMode", () => {
 				"create",
 				undefined,
 			);
+
+			const features = mockConfig.store.copyAll();
+			expect(features.length).toBe(1);
+
+			expect(features[0]).toEqual({
+				type: "Feature",
+				id: expect.any(String),
+				geometry: { type: "Point", coordinates: [0, 0] },
+				properties: {
+					mode: pointMode.mode,
+					createdAt: expect.any(Number),
+					updatedAt: expect.any(Number),
+				},
+			});
 		});
 
 		it("right click can delete a point if editable is true", () => {
@@ -209,7 +229,7 @@ describe("TerraDrawPointMode", () => {
 		});
 
 		describe("validate", () => {
-			it("does not create the point if validation returns false", () => {
+			it("does not create the point if validation returns false based on geometry", () => {
 				const pointMode = new TerraDrawPointMode({
 					validation: (feature) => {
 						return { valid: (feature.geometry as Point).coordinates[0] > 45 };
@@ -217,19 +237,38 @@ describe("TerraDrawPointMode", () => {
 				});
 
 				const mockConfig = MockModeConfig(pointMode.mode);
-
 				pointMode.register(mockConfig);
 
 				pointMode.onClick(MockCursorEvent({ lng: 30, lat: 0 }));
+
+				expect(mockConfig.onChange).not.toHaveBeenCalledWith(
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+			});
+
+			it("does not create the point if validation returns false based on properties", () => {
+				const pointMode = new TerraDrawPointMode({
+					validation: (feature) => {
+						return { valid: feature.properties.customProp === "allowed" };
+					},
+				});
+
+				const mockConfig = MockModeConfig(pointMode.mode);
+				pointMode.register(mockConfig);
+
+				pointMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
 				expect(mockConfig.onChange).toHaveBeenCalledTimes(0);
 				expect(mockConfig.onChange).not.toHaveBeenCalledWith(
 					[expect.any(String)],
 					"create",
+					undefined,
 				);
 			});
 
-			it("does create the point if validation returns true", () => {
+			it("does create the point if validation returns true based on geometry", () => {
 				const pointMode = new TerraDrawPointMode({
 					validation: (feature) => {
 						return { valid: (feature.geometry as Point).coordinates[0] > 45 };
@@ -237,10 +276,31 @@ describe("TerraDrawPointMode", () => {
 				});
 
 				const mockConfig = MockModeConfig(pointMode.mode);
-
 				pointMode.register(mockConfig);
 
 				pointMode.onClick(MockCursorEvent({ lng: 50, lat: 0 }));
+
+				expect(mockConfig.onChange).toHaveBeenCalledTimes(1);
+				expect(mockConfig.onChange).toHaveBeenCalledWith(
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+			});
+
+			it("does create the point if validation returns true based on properties", () => {
+				const pointMode = new TerraDrawPointMode({
+					validation: (feature) => {
+						return {
+							valid: feature.properties[COMMON_PROPERTIES.MARKER] === undefined,
+						};
+					},
+				});
+
+				const mockConfig = MockModeConfig(pointMode.mode);
+				pointMode.register(mockConfig);
+
+				pointMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
 				expect(mockConfig.onChange).toHaveBeenCalledTimes(1);
 				expect(mockConfig.onChange).toHaveBeenCalledWith(
@@ -404,7 +464,7 @@ describe("TerraDrawPointMode", () => {
 				2,
 				[expect.any(String)],
 				"update",
-				undefined,
+				{ target: "geometry" },
 			);
 
 			// On finished called from onClick and is then only called after onDragEnd
@@ -452,6 +512,7 @@ describe("TerraDrawPointMode", () => {
 			pointMode.register(mockConfig);
 
 			pointMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			expect(mockConfig.onFinish).toHaveBeenCalledTimes(1);
 
 			const setMapDraggability = jest.fn();
 			pointMode.onDragStart(
@@ -556,8 +617,10 @@ describe("TerraDrawPointMode", () => {
 				styles: {
 					pointColor: "#ffffff",
 					pointWidth: 4,
+					pointOpacity: 0.5,
 					pointOutlineColor: "#111111",
 					pointOutlineWidth: 2,
+					pointOutlineOpacity: 0.75,
 				},
 			});
 
@@ -570,8 +633,10 @@ describe("TerraDrawPointMode", () => {
 			).toMatchObject({
 				pointColor: "#ffffff",
 				pointWidth: 4,
+				pointOpacity: 0.5,
 				pointOutlineColor: "#111111",
 				pointOutlineWidth: 2,
+				pointOutlineOpacity: 0.75,
 			});
 		});
 
@@ -580,8 +645,10 @@ describe("TerraDrawPointMode", () => {
 				styles: {
 					pointColor: () => "#ffffff",
 					pointWidth: () => 4,
+					pointOpacity: () => 0.5,
 					pointOutlineColor: () => "#111111",
 					pointOutlineWidth: () => 2,
+					pointOutlineOpacity: () => 0.75,
 				},
 			});
 
@@ -594,8 +661,10 @@ describe("TerraDrawPointMode", () => {
 			).toMatchObject({
 				pointColor: "#ffffff",
 				pointWidth: 4,
+				pointOpacity: 0.5,
 				pointOutlineColor: "#111111",
 				pointOutlineWidth: 2,
+				pointOutlineOpacity: 0.75,
 			});
 		});
 

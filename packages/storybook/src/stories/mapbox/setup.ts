@@ -2,7 +2,8 @@ import mapboxgl from "mapbox-gl";
 import {
 	setupMapContainer,
 	setupControls,
-	onNextFrame,
+	SetupUndoRedo,
+	whenElementExists,
 } from "../../common/setup";
 import { TerraDraw } from "../../../../terra-draw/src/terra-draw";
 import { TerraDrawMapboxGLAdapter } from "../../../../terra-draw-mapbox-gl-adapter/src/terra-draw-mapbox-gl-adapter";
@@ -76,9 +77,9 @@ export function SetupMapbox(args: StoryArgs): HTMLElement {
 	}
 
 	const { container, controls, mapContainer, modeButtons, clearButton, modes } =
-		setupMapContainer(args);
+		setupMapContainer({ ...args, adapter: "mapbox" });
 
-	onNextFrame(() => {
+	whenElementExists(`#${mapContainer.id}`, () => {
 		const { map } = initialiseMapboxMap({
 			mapContainer,
 			centerLat: args.centerLat,
@@ -93,6 +94,7 @@ export function SetupMapbox(args: StoryArgs): HTMLElement {
 					map,
 				}),
 				modes,
+				undoRedo: SetupUndoRedo(args),
 			});
 
 			draw.start();

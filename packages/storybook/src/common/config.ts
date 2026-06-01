@@ -1,6 +1,6 @@
 import { StoryObj } from "@storybook/html";
 import { TerraDraw } from "../../../terra-draw/src/terra-draw";
-import { waitFor, within, expect } from "@storybook/test";
+import { waitFor, within, expect } from "storybook/test";
 
 export type Story = StoryObj<StoryArgs>;
 
@@ -18,6 +18,7 @@ export interface StoryArgs {
 	instructions?: string;
 	afterRender?: (draw: TerraDraw) => void;
 	showButtons?: boolean;
+	enableUndoRedo?: boolean;
 }
 
 export const DefaultZoom = {
@@ -26,16 +27,26 @@ export const DefaultZoom = {
 
 export const DefaultPlay = {
 	play: (async ({ canvasElement, args }) => {
-		await within(canvasElement).findByTestId("container");
+		const container = await within(canvasElement).findByTestId("container");
+		const adapter = container.getAttribute("data-adapter");
 
 		if (args.showButtons === false) {
+			return;
+		}
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const env = (import.meta as any).env;
+
+		if (
+			(!env.GOOGLE_API_KEY && adapter === "google") ||
+			(!env.MAPBOX_ACCESS_TOKEN && adapter === "mapbox")
+		) {
 			return;
 		}
 
 		await waitFor(
 			async () => {
 				const buttons = await within(canvasElement).findAllByRole("button");
-
 				buttons.forEach((button) => {
 					expect(button).not.toBeDisabled();
 				});

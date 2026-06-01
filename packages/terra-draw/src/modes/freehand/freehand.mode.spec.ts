@@ -46,6 +46,33 @@ describe("TerraDrawFreehandMode", () => {
 				keyEvents: { cancel: null, finish: null },
 			});
 		});
+
+		it("constructs with custom mode name", () => {
+			const freehandMode = new TerraDrawFreehandMode({
+				modeName: "custom",
+			});
+			expect(freehandMode.mode).toBe("custom");
+		});
+
+		it("constructs with drawInteraction option", () => {
+			new TerraDrawFreehandMode({
+				drawInteraction: "click-move",
+			});
+
+			new TerraDrawFreehandMode({
+				drawInteraction: "click-drag",
+			});
+
+			new TerraDrawFreehandMode({
+				drawInteraction: "click-move-or-drag",
+			});
+		});
+
+		it("constructs with smoothing option", () => {
+			new TerraDrawFreehandMode({
+				smoothing: 0.5,
+			});
+		});
 	});
 
 	describe("lifecycle", () => {
@@ -206,9 +233,16 @@ describe("TerraDrawFreehandMode", () => {
 			it("adds a polygon and closing point to store if registered", () => {
 				freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-				expect(onChange).toHaveBeenCalledTimes(1);
-				expect(onChange).toHaveBeenCalledWith(
-					[expect.any(String), expect.any(String)],
+				expect(onChange).toHaveBeenNthCalledWith(
+					1,
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+
+				expect(onChange).toHaveBeenNthCalledWith(
+					2,
+					[expect.any(String)],
 					"create",
 					undefined,
 				);
@@ -218,6 +252,31 @@ describe("TerraDrawFreehandMode", () => {
 				expect(features[0].geometry.type).toBe("Polygon");
 				expect(features[1].geometry.type).toBe("Point");
 				expect(features[1].properties.closingPoint).toBe(true);
+			});
+
+			describe.each([
+				["click-move" as const, true],
+				["click-move-or-drag" as const, true],
+				["click-drag" as const, false],
+			])("with drawInteraction %s", (drawInteraction, shouldAddPolygon) => {
+				it(`${shouldAddPolygon ? "adds" : "does not add"} a polygon to store`, () => {
+					freehandMode = new TerraDrawFreehandMode({
+						drawInteraction,
+					});
+
+					const mockConfig = MockModeConfig(freehandMode.mode);
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+					store = mockConfig.store;
+
+					freehandMode.register(mockConfig);
+					freehandMode.start();
+
+					freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+					expect(onChange).toHaveBeenCalledTimes(shouldAddPolygon ? 2 : 0);
+					expect(onFinish).toHaveBeenCalledTimes(0);
+				});
 			});
 
 			it("finishes drawing polygon on second click", () => {
@@ -240,12 +299,6 @@ describe("TerraDrawFreehandMode", () => {
 					features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
 				).toBe(undefined);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
-				expect(onChange).toHaveBeenCalledWith(
-					[expect.any(String), expect.any(String)],
-					"create",
-					undefined,
-				);
 				expect(onFinish).toHaveBeenCalledTimes(1);
 			});
 
@@ -309,7 +362,6 @@ describe("TerraDrawFreehandMode", () => {
 				features = store.copyAll();
 				expect(features.length).toBe(2);
 
-				expect(onChange).toHaveBeenCalledTimes(3);
 				expect(onFinish).not.toHaveBeenCalled();
 			});
 
@@ -328,7 +380,6 @@ describe("TerraDrawFreehandMode", () => {
 				expect(features.length).toBe(1);
 				expect(features[0].geometry.type).toBe("Polygon");
 
-				expect(onChange).toHaveBeenCalledTimes(4);
 				expect(onFinish).toHaveBeenCalledTimes(1);
 				expect(onFinish).toHaveBeenNthCalledWith(1, expect.any(String), {
 					action: "draw",
@@ -358,15 +409,21 @@ describe("TerraDrawFreehandMode", () => {
 		it("updates the freehand polygon when the mouse cursor has moved a minimum amount", () => {
 			freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-			expect(onChange).toHaveBeenCalledTimes(1);
+			expect(onChange).toHaveBeenCalledTimes(2);
 			expect(onChange).toHaveBeenNthCalledWith(
 				1,
-				[expect.any(String), expect.any(String)],
+				[expect.any(String)],
+				"create",
+				undefined,
+			);
+			expect(onChange).toHaveBeenNthCalledWith(
+				2,
+				[expect.any(String)],
 				"create",
 				undefined,
 			);
 
-			const feature = store.copyAll()[0];
+			const [feature] = store.copyAll();
 
 			for (let i = 1; i < 6; i++) {
 				freehandMode.onMouseMove(
@@ -377,14 +434,63 @@ describe("TerraDrawFreehandMode", () => {
 				);
 			}
 
-			expect(onChange).toHaveBeenCalledTimes(6);
+			expect(onChange).toHaveBeenCalledTimes(7);
 
-			const updatedFeature = store.copyAll()[0];
+			const [updatedFeature] = store.copyAll();
 
 			expect(feature.id).toBe(updatedFeature.id);
 			expect(feature.geometry.coordinates).not.toStrictEqual(
 				updatedFeature.geometry.coordinates,
 			);
+		});
+
+		it("smooths inserted coordinates when smoothing is enabled", () => {
+			freehandMode = new TerraDrawFreehandMode({
+				smoothing: 0.5,
+				minDistance: 1,
+			});
+
+			const mockConfig = MockModeConfig(freehandMode.mode);
+			store = mockConfig.store;
+			onChange = mockConfig.onChange;
+			onFinish = mockConfig.onFinish;
+			freehandMode.register(mockConfig);
+			freehandMode.start();
+
+			freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			freehandMode.onMouseMove(MockCursorEvent({ lng: 10, lat: 10 }));
+
+			const [updatedFeature] = store.copyAll();
+			const coordinates = (updatedFeature.geometry as Polygon).coordinates[0];
+			const insertedCoordinate = coordinates[coordinates.length - 2];
+
+			expect(insertedCoordinate).toStrictEqual([5, 5]);
+		});
+
+		it("does not stall drawing when smoothing is set to 1", () => {
+			freehandMode = new TerraDrawFreehandMode({
+				smoothing: 1,
+				minDistance: 1,
+			});
+
+			const mockConfig = MockModeConfig(freehandMode.mode);
+			store = mockConfig.store;
+			onChange = mockConfig.onChange;
+			onFinish = mockConfig.onFinish;
+			freehandMode.register(mockConfig);
+			freehandMode.start();
+
+			freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+			freehandMode.onMouseMove(MockCursorEvent({ lng: 10, lat: 10 }));
+
+			const [updatedFeature] = store.copyAll();
+			const coordinates = (updatedFeature.geometry as Polygon).coordinates[0];
+			const insertedCoordinate = coordinates[coordinates.length - 2];
+
+			expect(insertedCoordinate[0]).toBeGreaterThan(0);
+			expect(insertedCoordinate[1]).toBeGreaterThan(0);
+			expect(insertedCoordinate[0]).toBeLessThan(10);
+			expect(insertedCoordinate[1]).toBeLessThan(10);
 		});
 
 		it("does nothing if no first click", () => {
@@ -406,15 +512,21 @@ describe("TerraDrawFreehandMode", () => {
 
 				freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-				expect(onChange).toHaveBeenCalledTimes(1);
+				expect(onChange).toHaveBeenCalledTimes(2);
 				expect(onChange).toHaveBeenNthCalledWith(
 					1,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					2,
+					[expect.any(String)],
 					"create",
 					undefined,
 				);
 
-				const feature = store.copyAll()[0];
+				const [feature] = store.copyAll();
 
 				freehandMode.onMouseMove(
 					MockCursorEvent({
@@ -444,11 +556,9 @@ describe("TerraDrawFreehandMode", () => {
 					}),
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
-
 				expect(onFinish).toHaveBeenCalledTimes(1);
 
-				const updatedFeature = store.copyAll()[0];
+				const [updatedFeature] = store.copyAll();
 
 				expect(followsRightHandRule(updatedFeature.geometry as Polygon)).toBe(
 					true,
@@ -472,15 +582,21 @@ describe("TerraDrawFreehandMode", () => {
 
 				freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-				expect(onChange).toHaveBeenCalledTimes(1);
+				expect(onChange).toHaveBeenCalledTimes(2);
 				expect(onChange).toHaveBeenNthCalledWith(
 					1,
-					[expect.any(String), expect.any(String)],
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					2,
+					[expect.any(String)],
 					"create",
 					undefined,
 				);
 
-				const feature = store.copyAll()[0];
+				const [feature] = store.copyAll();
 
 				freehandMode.onMouseMove(
 					MockCursorEvent({
@@ -510,7 +626,7 @@ describe("TerraDrawFreehandMode", () => {
 					}),
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
+				expect(onChange).toHaveBeenCalledTimes(6);
 
 				expect(onFinish).toHaveBeenCalledTimes(1);
 
@@ -521,9 +637,9 @@ describe("TerraDrawFreehandMode", () => {
 					}),
 				);
 
-				expect(onChange).toHaveBeenCalledTimes(5);
+				expect(onChange).toHaveBeenCalledTimes(6);
 
-				const updatedFeature = store.copyAll()[0];
+				const [updatedFeature] = store.copyAll();
 
 				expect(feature.id).toBe(updatedFeature.id);
 				expect(feature.geometry.coordinates).not.toStrictEqual(
@@ -553,15 +669,21 @@ describe("TerraDrawFreehandMode", () => {
 		it("can close the polygon if autoClose is enabled and the cursor comes back to the starting point", () => {
 			freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-			expect(onChange).toHaveBeenCalledTimes(1);
+			expect(onChange).toHaveBeenCalledTimes(2);
 			expect(onChange).toHaveBeenNthCalledWith(
 				1,
-				[expect.any(String), expect.any(String)],
+				[expect.any(String)],
+				"create",
+				undefined,
+			);
+			expect(onChange).toHaveBeenNthCalledWith(
+				2,
+				[expect.any(String)],
 				"create",
 				undefined,
 			);
 
-			const feature = store.copyAll()[0];
+			const [feature] = store.copyAll();
 
 			freehandMode.onMouseMove(
 				MockCursorEvent({
@@ -591,11 +713,11 @@ describe("TerraDrawFreehandMode", () => {
 				}),
 			);
 
-			expect(onChange).toHaveBeenCalledTimes(5);
+			expect(onChange).toHaveBeenCalledTimes(6);
 
 			expect(onFinish).toHaveBeenCalledTimes(1);
 
-			const updatedFeature = store.copyAll()[0];
+			const [updatedFeature] = store.copyAll();
 			expect(followsRightHandRule(updatedFeature.geometry as Polygon)).toBe(
 				true,
 			);
@@ -629,9 +751,9 @@ describe("TerraDrawFreehandMode", () => {
 
 			freehandMode.cleanUp();
 
-			expect(onChange).toHaveBeenCalledTimes(3);
+			expect(onChange).toHaveBeenCalledTimes(4);
 			expect(onChange).toHaveBeenNthCalledWith(
-				2,
+				3,
 				[expect.any(String)],
 				"delete",
 				undefined,
@@ -699,6 +821,20 @@ describe("TerraDrawFreehandMode", () => {
 		describe("finish", () => {
 			it("finishes drawing polygon on finish key press", () => {
 				freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+				expect(onChange).toHaveBeenCalledTimes(2);
+				expect(onChange).toHaveBeenNthCalledWith(
+					1,
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+				expect(onChange).toHaveBeenNthCalledWith(
+					2,
+					[expect.any(String)],
+					"create",
+					undefined,
+				);
+
 				freehandMode.onMouseMove(MockCursorEvent({ lng: 0, lat: 1 }));
 
 				let features = store.copyAll();
@@ -718,28 +854,16 @@ describe("TerraDrawFreehandMode", () => {
 
 				expect(onChange).toHaveBeenCalledTimes(5);
 				expect(onChange).toHaveBeenNthCalledWith(
-					1,
-					[expect.any(String), expect.any(String)],
-					"create",
-					undefined,
-				);
-				expect(onChange).toHaveBeenNthCalledWith(
-					2,
-					[expect.any(String)],
-					"update",
-					undefined,
-				);
-				expect(onChange).toHaveBeenNthCalledWith(
 					3,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "geometry" },
 				);
 				expect(onChange).toHaveBeenNthCalledWith(
 					4,
 					[expect.any(String)],
 					"update",
-					undefined,
+					{ target: "properties" },
 				);
 				expect(onChange).toHaveBeenNthCalledWith(
 					5,
@@ -757,33 +881,234 @@ describe("TerraDrawFreehandMode", () => {
 	});
 
 	describe("onDrag", () => {
-		it("does nothing", () => {
-			const freehandMode = new TerraDrawFreehandMode();
+		let store: TerraDrawGeoJSONStore;
+		let onChange: jest.Mock;
+		let onFinish: jest.Mock;
+		let setMapDraggability: jest.Mock;
 
-			expect(() => {
-				freehandMode.onDrag();
-			}).not.toThrow();
+		beforeEach(() => {
+			setMapDraggability = jest.fn();
 		});
+
+		describe.each([
+			["without drawInteraction option", undefined],
+			["with drawInteraction click-move", "click-move" as const],
+		])("%s", (_, drawInteraction) => {
+			it("does nothing", () => {
+				const freehandMode = new TerraDrawFreehandMode(
+					drawInteraction ? { drawInteraction } : undefined,
+				);
+
+				const mockConfig = MockModeConfig(freehandMode.mode);
+				store = mockConfig.store;
+				onChange = mockConfig.onChange;
+				onFinish = mockConfig.onFinish;
+				freehandMode.register(mockConfig);
+				freehandMode.start();
+
+				freehandMode.onDrag(
+					MockCursorEvent({ lng: 0, lat: 0 }),
+					setMapDraggability,
+				);
+
+				expect(store.copyAll().length).toBe(0);
+				expect(onFinish).toHaveBeenCalledTimes(0);
+				expect(onChange).toHaveBeenCalledTimes(0);
+			});
+		});
+
+		describe.each(["click-drag" as const, "click-move-or-drag" as const])(
+			"with drawInteraction %s",
+			(drawInteraction) => {
+				it("updates the freehand polygon", () => {
+					const freehandMode = new TerraDrawFreehandMode({
+						drawInteraction,
+					});
+
+					const mockConfig = MockModeConfig(freehandMode.mode);
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+					freehandMode.register(mockConfig);
+					freehandMode.start();
+
+					freehandMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					expect(onChange).toHaveBeenCalledTimes(2);
+					expect(setMapDraggability).toHaveBeenCalledTimes(1);
+
+					const [feature] = store.copyAll();
+
+					for (let index = 1; index < 6; index++) {
+						freehandMode.onDrag(
+							MockCursorEvent({ lng: index, lat: index }),
+							setMapDraggability,
+						);
+					}
+
+					expect(onFinish).toHaveBeenCalledTimes(0);
+					expect(onChange).toHaveBeenCalledTimes(7);
+
+					const [updatedFeature] = store.copyAll();
+					expect(feature.id).toBe(updatedFeature.id);
+					expect(feature.geometry.coordinates).not.toStrictEqual(
+						updatedFeature.geometry.coordinates,
+					);
+				});
+			},
+		);
 	});
 
 	describe("onDragStart", () => {
-		it("does nothing", () => {
-			const freehandMode = new TerraDrawFreehandMode();
+		let store: TerraDrawGeoJSONStore;
+		let onChange: jest.Mock;
+		let onFinish: jest.Mock;
+		let setMapDraggability: jest.Mock;
 
-			expect(() => {
-				freehandMode.onDragStart();
-			}).not.toThrow();
+		beforeEach(() => {
+			setMapDraggability = jest.fn();
 		});
+
+		describe.each([
+			["without drawInteraction option", undefined],
+			["with drawInteraction click-move", "click-move" as const],
+		])("%s", (_, drawInteraction) => {
+			it("does nothing", () => {
+				const freehandMode = new TerraDrawFreehandMode(
+					drawInteraction ? { drawInteraction } : undefined,
+				);
+				const mockConfig = MockModeConfig(freehandMode.mode);
+
+				store = mockConfig.store;
+				onChange = mockConfig.onChange;
+				onFinish = mockConfig.onFinish;
+				freehandMode.register(mockConfig);
+				freehandMode.start();
+
+				freehandMode.onDragStart(
+					MockCursorEvent({ lng: 0, lat: 0 }),
+					setMapDraggability,
+				);
+
+				expect(store.copyAll().length).toBe(0);
+				expect(onChange).toHaveBeenCalledTimes(0);
+				expect(onFinish).toHaveBeenCalledTimes(0);
+				expect(setMapDraggability).toHaveBeenCalledTimes(0);
+			});
+		});
+
+		describe.each(["click-drag" as const, "click-move-or-drag" as const])(
+			"with drawInteraction %s",
+			(drawInteraction) => {
+				it("adds a polygon and closing point to store", () => {
+					const freehandMode = new TerraDrawFreehandMode({
+						drawInteraction,
+					});
+
+					const mockConfig = MockModeConfig(freehandMode.mode);
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+					freehandMode.register(mockConfig);
+					freehandMode.start();
+
+					freehandMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					expect(onChange).toHaveBeenCalledTimes(2);
+					expect(store.copyAll().length).toBe(2);
+					expect(setMapDraggability).toHaveBeenCalledTimes(1);
+					expect(onFinish).toHaveBeenCalledTimes(0);
+				});
+			},
+		);
 	});
 
 	describe("onDragEnd", () => {
-		it("does nothing", () => {
-			const freehandMode = new TerraDrawFreehandMode();
+		let store: TerraDrawGeoJSONStore;
+		let onChange: jest.Mock;
+		let onFinish: jest.Mock;
+		let setMapDraggability: jest.Mock;
 
-			expect(() => {
-				freehandMode.onDragEnd();
-			}).not.toThrow();
+		beforeEach(() => {
+			setMapDraggability = jest.fn();
 		});
+
+		describe.each([
+			["without drawInteraction option", undefined],
+			["with drawInteraction click-move", "click-move" as const],
+		])("%s", (_, drawInteraction) => {
+			it("does nothing", () => {
+				const freehandMode = new TerraDrawFreehandMode(
+					drawInteraction ? { drawInteraction } : undefined,
+				);
+				const mockConfig = MockModeConfig(freehandMode.mode);
+
+				store = mockConfig.store;
+				onChange = mockConfig.onChange;
+				onFinish = mockConfig.onFinish;
+				freehandMode.register(mockConfig);
+				freehandMode.start();
+
+				freehandMode.onDragEnd(
+					MockCursorEvent({ lng: 0, lat: 0 }),
+					setMapDraggability,
+				);
+
+				expect(store.copyAll().length).toBe(0);
+				expect(onChange).toHaveBeenCalledTimes(0);
+				expect(onFinish).toHaveBeenCalledTimes(0);
+				expect(setMapDraggability).toHaveBeenCalledTimes(0);
+			});
+		});
+
+		describe.each(["click-drag" as const, "click-move-or-drag" as const])(
+			"with drawInteraction %s",
+			(drawInteraction) => {
+				it("finishes drawing and enables map draggability", () => {
+					const freehandMode = new TerraDrawFreehandMode({
+						drawInteraction,
+					});
+
+					const mockConfig = MockModeConfig(freehandMode.mode);
+					store = mockConfig.store;
+					onChange = mockConfig.onChange;
+					onFinish = mockConfig.onFinish;
+					freehandMode.register(mockConfig);
+					freehandMode.start();
+
+					freehandMode.onDragStart(
+						MockCursorEvent({ lng: 0, lat: 0 }),
+						setMapDraggability,
+					);
+
+					freehandMode.onDrag(
+						MockCursorEvent({ lng: 1, lat: 1 }),
+						setMapDraggability,
+					);
+
+					freehandMode.onDragEnd(
+						MockCursorEvent({ lng: 2, lat: 2 }),
+						setMapDraggability,
+					);
+
+					const features = store.copyAll();
+					expect(features.length).toBe(1);
+					expect(
+						features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+					).toBe(undefined);
+					expect(onFinish).toHaveBeenCalledTimes(1);
+					expect(setMapDraggability).toHaveBeenCalledTimes(2);
+					expect(setMapDraggability).toHaveBeenNthCalledWith(1, false);
+					expect(setMapDraggability).toHaveBeenNthCalledWith(2, true);
+				});
+			},
+		);
 	});
 
 	describe("styleFeature", () => {
@@ -1028,16 +1353,22 @@ describe("TerraDrawFreehandMode", () => {
 
 			freehandMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
-			expect(mockConfig.onChange).toHaveBeenCalledTimes(1);
+			expect(mockConfig.onChange).toHaveBeenCalledTimes(2);
 			expect(mockConfig.onChange).toHaveBeenNthCalledWith(
 				1,
-				[expect.any(String), expect.any(String)],
+				[expect.any(String)],
+				"create",
+				undefined,
+			);
+			expect(mockConfig.onChange).toHaveBeenNthCalledWith(
+				2,
+				[expect.any(String)],
 				"create",
 				undefined,
 			);
 
-			const freehandPolygonFeature = mockConfig.store.copyAll()[0];
-			const freehandClosingPointFeature = mockConfig.store.copyAll()[1];
+			const [freehandPolygonFeature, freehandClosingPointFeature] =
+				mockConfig.store.copyAll();
 
 			freehandMode.onMouseMove(
 				MockCursorEvent({

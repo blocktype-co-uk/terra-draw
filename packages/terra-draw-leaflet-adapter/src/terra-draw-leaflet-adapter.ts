@@ -10,7 +10,9 @@ import {
 } from "terra-draw";
 import L from "leaflet";
 
-export class TerraDrawLeafletAdapter extends TerraDrawExtend.TerraDrawBaseAdapter {
+export class TerraDrawLeafletAdapter
+	extends TerraDrawExtend.TerraDrawBaseAdapter
+{
 	constructor(
 		config: {
 			lib: typeof L;
@@ -103,12 +105,39 @@ export class TerraDrawLeafletAdapter extends TerraDrawExtend.TerraDrawBaseAdapte
 					);
 				}
 
+				const markerUrl = featureStyles.markerUrl;
+				const markerHeight = featureStyles.markerHeight;
+				const markerWidth = featureStyles.markerWidth;
+
+				if (markerUrl && markerHeight && markerWidth) {
+					// If a markerUrl is provided, use a divIcon to render the image
+					const icon = L.divIcon({
+						className: "",
+						html: `<img src="${markerUrl}" style="width: ${markerWidth}px; height: ${markerHeight}px;" />`,
+						iconSize: [markerWidth, markerHeight],
+						iconAnchor: [markerWidth / 2, markerHeight],
+					});
+
+					return L.marker(latlng, {
+						icon,
+						pane: paneId,
+						interactive: false, // Removes mouse hover cursor styles
+					});
+				}
+
+				const pointOutlineOpacity = (
+					featureStyles as { pointOutlineOpacity?: number }
+				).pointOutlineOpacity;
+				const pointOpacity = (featureStyles as { pointOpacity?: number })
+					.pointOpacity;
+
 				const styles = {
 					radius: featureStyles.pointWidth,
 					stroke: featureStyles.pointOutlineWidth || false,
+					opacity: pointOutlineOpacity === undefined ? 1 : pointOutlineOpacity,
 					color: featureStyles.pointOutlineColor,
 					weight: featureStyles.pointOutlineWidth,
-					fillOpacity: 0.8,
+					fillOpacity: pointOpacity === undefined ? 1 : pointOpacity,
 					fillColor: featureStyles.pointColor,
 					pane: paneId,
 					interactive: false, // Removes mouse hover cursor styles
@@ -141,19 +170,40 @@ export class TerraDrawLeafletAdapter extends TerraDrawExtend.TerraDrawBaseAdapte
 				}
 
 				if (feature.geometry.type === "LineString") {
+					// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+					const lineStringOpacity = (
+						featureStyles as { lineStringOpacity?: number }
+					).lineStringOpacity;
+					// Backwards compatible read: pre Terra Draw v1.24.0 will not have this field in the interface
+					const lineStringDash = (
+						featureStyles as {
+							lineStringDash?: [number, number];
+						}
+					).lineStringDash;
+
 					return {
 						interactive: false, // Removes mouse hover cursor styles
 						color: featureStyles.lineStringColor,
 						weight: featureStyles.lineStringWidth,
 						pane: paneId,
+						opacity: lineStringOpacity === undefined ? 1 : lineStringOpacity,
+						dashArray: lineStringDash
+							? `${lineStringDash[0]} ${lineStringDash[1]}`
+							: undefined,
 					};
 				} else if (feature.geometry.type === "Polygon") {
+					const polygonOutlineOpacity = (
+						featureStyles as { polygonOutlineOpacity?: number }
+					).polygonOutlineOpacity;
+
 					return {
 						interactive: false, // Removes mouse hover cursor styles
 						fillOpacity: featureStyles.polygonFillOpacity,
 						fillColor: featureStyles.polygonFillColor,
 						weight: featureStyles.polygonOutlineWidth,
 						stroke: true,
+						opacity:
+							polygonOutlineOpacity === undefined ? 1 : polygonOutlineOpacity,
 						color: featureStyles.polygonOutlineColor,
 						pane: paneId,
 					};

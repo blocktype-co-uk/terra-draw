@@ -1,14 +1,17 @@
-import { Loader } from "@googlemaps/js-api-loader";
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import {
 	setupMapContainer,
 	setupControls,
-	onNextFrame,
+	SetupUndoRedo,
+	whenElementExists,
 } from "../../common/setup";
 import { TerraDraw } from "../../../../terra-draw/src/terra-draw";
 import { TerraDrawGoogleMapsAdapter } from "../../../../terra-draw-google-maps-adapter/src/terra-draw-google-maps-adapter";
 import { StoryArgs } from "../../common/config";
 
-export const initialiseGoogleMap = async ({
+let setOptionsCalled = false;
+
+const initialiseGoogleMap = async ({
 	mapContainer,
 	centerLat,
 	centerLng,
@@ -19,23 +22,27 @@ export const initialiseGoogleMap = async ({
 	centerLng: number;
 	zoom: number;
 }) => {
-	// Check for Google Maps API key (can be set via environment or global)
-	let apiKey = (import.meta as any).env.GOOGLE_API_KEY;
+	if (!setOptionsCalled) {
+		// Check for Google Maps API key (can be set via environment or global)
+		const apiKey = (import.meta as any).env.GOOGLE_API_KEY;
 
-	// If no API key is provided, use empty string (will still work for development)
-	if (!apiKey) {
-		throw new Error(
-			"Google Maps API key is required. Please set it in your environment variables or as a global variable.",
-		);
+		// If no API key is provided, use empty string (will still work for development)
+		if (!apiKey) {
+			throw new Error(
+				"Google Maps API key is required. Please set it in your environment variables or as a global variable.",
+			);
+		}
+
+		setOptions({
+			key: apiKey,
+			v: "weekly",
+		});
+
+		setOptionsCalled = true;
 	}
 
-	const loader = new Loader({
-		apiKey,
-		version: "weekly",
-	});
-
-	// Load Google Maps API
-	const google = await loader.load();
+	// Load Google Maps API (maps for Map/Data/OverlayView, core for LatLng/Point/Size)
+	await Promise.all([importLibrary("maps"), importLibrary("core")]);
 
 	// Create Google Maps instance
 	const map = new google.maps.Map(mapContainer, {
@@ -59,9 +66,9 @@ export function SetupGoogle(args: StoryArgs): HTMLElement {
 	}
 
 	const { container, controls, mapContainer, modeButtons, clearButton, modes } =
-		setupMapContainer(args);
+		setupMapContainer({ ...args, adapter: "google" });
 
-	onNextFrame(() => {
+	whenElementExists(`#${mapContainer.id}`, () => {
 		// Initialize Google Maps asynchronously
 		initialiseGoogleMap({
 			mapContainer,
@@ -80,6 +87,7 @@ export function SetupGoogle(args: StoryArgs): HTMLElement {
 					const draw = new TerraDraw({
 						adapter,
 						modes,
+						undoRedo: SetupUndoRedo(args),
 					});
 
 					draw.start();
@@ -100,8 +108,10 @@ export function SetupGoogle(args: StoryArgs): HTMLElement {
 				});
 			})
 			.catch((error) => {
+				// We don't use console.error as this breaks Storybook tests
+
 				// eslint-disable-next-line no-console
-				console.error("Error initializing Google Maps:", error);
+				console.warn("Error initializing Google Maps:", error);
 
 				// Add error message to container
 				const errorDiv = document.createElement("div");

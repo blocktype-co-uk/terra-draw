@@ -1,8 +1,4 @@
-import {
-	GeoJSONStore,
-	GeoJSONStoreFeatures,
-	JSONObject,
-} from "../../store/store";
+import { GeoJSONStore, GeoJSONStoreFeatures } from "../../store/store";
 import { MockModeConfig } from "../../test/mock-mode-config";
 import { MockCursorEvent } from "../../test/mock-cursor-event";
 import { TerraDrawAngledRectangleMode } from "./angled-rectangle.mode";
@@ -11,7 +7,6 @@ import { followsRightHandRule } from "../../geometry/boolean/right-hand-rule";
 import { MockKeyboardEvent } from "../../test/mock-keyboard-event";
 import { COMMON_PROPERTIES, TerraDrawGeoJSONStore } from "../../common";
 import { DefaultPointerEvents } from "../base.mode";
-import { MockPolygonSquare } from "../../test/mock-features";
 
 describe("TerraDrawAngledRectangleMode", () => {
 	describe("constructor", () => {
@@ -48,6 +43,13 @@ describe("TerraDrawAngledRectangleMode", () => {
 				styles: { fillColor: "#ffffff" },
 				keyEvents: { cancel: null, finish: null },
 			});
+		});
+
+		it("constructs with custom mode name", () => {
+			const angledRectangleMode = new TerraDrawAngledRectangleMode({
+				modeName: "custom",
+			});
+			expect(angledRectangleMode.mode).toBe("custom");
 		});
 	});
 
@@ -220,7 +222,7 @@ describe("TerraDrawAngledRectangleMode", () => {
 				[
 					[0, 0],
 					[1, 1],
-					[1, 0.999999], // Small offset to keep Mapbox GL happy
+					[1, 1],
 					[0, 0],
 				],
 			]);
@@ -244,8 +246,45 @@ describe("TerraDrawAngledRectangleMode", () => {
 				[
 					[0, 0],
 					[1, 1],
-					[1.5000158660846816, 0.5000539452154588],
-					[0.5000158660846818, -0.4999841341367969],
+					[1.500015866, 0.500053945],
+					[0.500015866, -0.499984134],
+					[0, 0],
+				],
+			]);
+		});
+
+		it("updates the coordinate to the mouse position after second click, respecting coordinate precision", () => {
+			angledRectangleMode = new TerraDrawAngledRectangleMode({
+				validation: () => ({ valid: true }),
+			});
+			const mockConfig = MockModeConfig(angledRectangleMode.mode);
+			onChange = mockConfig.onChange;
+
+			mockConfig.coordinatePrecision = 6;
+
+			store = mockConfig.store;
+			angledRectangleMode.register(mockConfig);
+			angledRectangleMode.start();
+
+			angledRectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
+
+			angledRectangleMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 1 }));
+
+			angledRectangleMode.onClick(MockCursorEvent({ lng: 1, lat: 1 }));
+
+			angledRectangleMode.onMouseMove(MockCursorEvent({ lng: 1, lat: 0 }));
+
+			expect(onChange).toHaveBeenCalledTimes(4);
+
+			const features = store.copyAll();
+			expect(features.length).toBe(1);
+
+			expect(features[0].geometry.coordinates).toStrictEqual([
+				[
+					[0, 0],
+					[1, 1],
+					[1.500016, 0.500054],
+					[0.500016, -0.499984],
 					[0, 0],
 				],
 			]);
@@ -255,6 +294,7 @@ describe("TerraDrawAngledRectangleMode", () => {
 	describe("onClick", () => {
 		let angledRectangleMode: TerraDrawAngledRectangleMode;
 		let store: TerraDrawGeoJSONStore;
+		let onFinish: jest.Mock;
 
 		describe("with successful validation", () => {
 			beforeEach(() => {
@@ -264,6 +304,7 @@ describe("TerraDrawAngledRectangleMode", () => {
 				const mockConfig = MockModeConfig(angledRectangleMode.mode);
 
 				store = mockConfig.store;
+				onFinish = mockConfig.onFinish;
 				angledRectangleMode.register(mockConfig);
 				angledRectangleMode.start();
 			});
@@ -282,13 +323,15 @@ describe("TerraDrawAngledRectangleMode", () => {
 				let features = store.copyAll();
 				expect(features.length).toBe(1);
 
+				const angledRectangle = features[0] as GeoJSONStoreFeatures<Polygon>;
+				expect(angledRectangle.geometry.type).toBe("Polygon");
+				expect(angledRectangle.geometry.coordinates[0]).toHaveLength(5);
+				expect(followsRightHandRule(angledRectangle.geometry)).toBe(true);
 				expect(
-					features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+					angledRectangle.properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
 				).toBe(undefined);
 
-				expect(followsRightHandRule(features[0].geometry as Polygon)).toBe(
-					true,
-				);
+				expect(onFinish).toHaveBeenCalledTimes(1);
 
 				// Create a new angled rectangle polygon
 				angledRectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
@@ -306,6 +349,7 @@ describe("TerraDrawAngledRectangleMode", () => {
 				const mockConfig = MockModeConfig(angledRectangleMode.mode);
 
 				store = mockConfig.store;
+				onFinish = mockConfig.onFinish;
 				angledRectangleMode.register(mockConfig);
 				angledRectangleMode.start();
 			});
@@ -324,11 +368,13 @@ describe("TerraDrawAngledRectangleMode", () => {
 				let features = store.copyAll();
 				expect(features.length).toBe(1);
 
-				// Create a new angled rectangle polygon
+				// Try again
 				angledRectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
 				features = store.copyAll();
 				expect(features.length).toBe(1);
+
+				expect(onFinish).toHaveBeenCalledTimes(0);
 			});
 		});
 
@@ -356,6 +402,7 @@ describe("TerraDrawAngledRectangleMode", () => {
 
 				let features = store.copyAll();
 				expect(features.length).toBe(0);
+				expect(onFinish).toHaveBeenCalledTimes(0);
 			});
 		});
 	});
@@ -414,6 +461,8 @@ describe("TerraDrawAngledRectangleMode", () => {
 
 			features = store.copyAll();
 			expect(features.length).toBe(0);
+
+			expect(onFinish).toHaveBeenCalledTimes(0);
 		});
 
 		it("finishes drawing angled rectangle on finish key press", () => {
@@ -449,23 +498,22 @@ describe("TerraDrawAngledRectangleMode", () => {
 			features = store.copyAll();
 			expect(features.length).toBe(1);
 
-			expect(features[0].properties[COMMON_PROPERTIES.CURRENTLY_DRAWING]).toBe(
-				undefined,
-			);
+			const angledRectangle = features[0] as GeoJSONStoreFeatures<Polygon>;
+			expect(angledRectangle.geometry.type).toBe("Polygon");
+			expect(angledRectangle.geometry.coordinates[0]).toHaveLength(5);
+			expect(followsRightHandRule(angledRectangle.geometry)).toBe(true);
+			expect(
+				angledRectangle.properties[COMMON_PROPERTIES.CURRENTLY_DRAWING],
+			).toBe(undefined);
+
+			expect(onFinish).toHaveBeenCalledTimes(1);
 
 			rectangleMode.onClick(MockCursorEvent({ lng: 0, lat: 0 }));
 
 			features = store.copyAll();
+
 			// Two as the rectangle has been closed via enter
 			expect(features.length).toBe(2);
-
-			expect(onChange).toHaveBeenCalledTimes(6);
-			expect(onChange).toHaveBeenCalledWith(
-				[expect.any(String)],
-				"create",
-				undefined,
-			);
-			expect(onFinish).toHaveBeenCalledTimes(1);
 		});
 
 		it("does not finish on key press when keyEvents null", () => {

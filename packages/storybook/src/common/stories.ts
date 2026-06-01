@@ -13,7 +13,10 @@ import {
 	TerraDrawSelectMode,
 	GeoJSONStoreFeatures,
 	HexColor,
+	TerraDrawMarkerMode,
+	TerraDrawPolyLineMode,
 } from "../../../terra-draw/src/terra-draw";
+
 import {
 	DefaultSize,
 	LocationNewYork,
@@ -41,6 +44,77 @@ const Point: Story = {
 	},
 };
 
+const MarkerPNG: Story = {
+	...DefaultStory,
+	args: {
+		id: "marker-png",
+		modes: [
+			() =>
+				new TerraDrawMarkerMode({
+					styles: {
+						markerUrl:
+							"https://leafletjs.com/examples/custom-icons/leaf-green.png",
+						markerWidth: 25,
+						markerHeight: 60,
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+const MarkerJPG: Story = {
+	...DefaultStory,
+	args: {
+		id: "marker-jpg",
+		modes: [
+			() =>
+				new TerraDrawMarkerMode({
+					styles: {
+						markerUrl:
+							"https://upload.wikimedia.org/wikipedia/commons/1/1e/Marker_location.jpg",
+						markerWidth: 226 / 10,
+						markerHeight: 393 / 10,
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+// Opacity drawing story
+const Opacity: Story = {
+	...DefaultStory,
+	args: {
+		id: "opacity",
+		modes: [
+			() =>
+				new TerraDrawPointMode({
+					styles: {
+						pointOpacity: 0.5,
+						pointOutlineOpacity: 0.75,
+					},
+				}),
+			() =>
+				new TerraDrawLineStringMode({
+					styles: {
+						lineStringOpacity: 0.5,
+						closingPointOpacity: 0.75,
+					},
+				}),
+			() =>
+				new TerraDrawPolygonMode({
+					styles: {
+						fillOpacity: 0.5,
+						outlineOpacity: 0.5,
+						closingPointOpacity: 0.75,
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
 // Polygon drawing story
 const Polygon: Story = {
 	...DefaultStory,
@@ -55,7 +129,7 @@ const Polygon: Story = {
 const PolygonWithCoordinateCounts: Story = {
 	...DefaultStory,
 	args: {
-		id: "polygon",
+		id: "polygon-wtih-coordinate-counts",
 		modes: [() => new TerraDrawPolygonMode()],
 		instructions:
 			"Click to add points, the provisional and committed coordinate counts will appear here",
@@ -185,6 +259,9 @@ const ZIndexOrdering: Story = {
 		modes: [
 			() =>
 				new TerraDrawPolygonMode({
+					snapping: {
+						toCoordinate: true,
+					},
 					showCoordinatePoints: true,
 					editable: true,
 					styles: {
@@ -228,12 +305,72 @@ const Circle: Story = {
 	},
 };
 
+// Circle drawing with click-drag interaction story
+const CircleWithClickDragInteraction: Story = {
+	...DefaultStory,
+	args: {
+		id: "circle-with-click-drag-interaction",
+		modes: [
+			() =>
+				new TerraDrawCircleMode({
+					drawInteraction: "click-drag",
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+// Circle drawing with click-move-or-drag interaction story
+const CircleWithClickMoveOrDragInteraction: Story = {
+	...DefaultStory,
+	args: {
+		id: "circle-with-click-move-or-drag-interaction",
+		modes: [
+			() =>
+				new TerraDrawCircleMode({
+					drawInteraction: "click-move-or-drag",
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
 // Rectangle drawing story
 const Rectangle: Story = {
 	...DefaultStory,
 	args: {
 		id: "rectangle",
 		modes: [() => new TerraDrawRectangleMode()],
+		...DefaultStory.args,
+	},
+};
+
+// Rectangle drawing with click-drag interaction story
+const RectangleWithClickDragInteraction: Story = {
+	...DefaultStory,
+	args: {
+		id: "rectangle-with-click-drag-interaction",
+		modes: [
+			() =>
+				new TerraDrawRectangleMode({
+					drawInteraction: "click-drag",
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+// Rectangle drawing with click-move-or-drag interaction story
+const RectangleWithClickMoveOrDragInteraction: Story = {
+	...DefaultStory,
+	args: {
+		id: "rectangle-with-click-move-or-drag-interaction",
+		modes: [
+			() =>
+				new TerraDrawRectangleMode({
+					drawInteraction: "click-move-or-drag",
+				}),
+		],
 		...DefaultStory.args,
 	},
 };
@@ -264,6 +401,54 @@ const LineString: Story = {
 	args: {
 		id: "linestring",
 		modes: [() => new TerraDrawLineStringMode()],
+		...DefaultStory.args,
+	},
+};
+
+// Polyline drawing story
+const PolyLine: Story = {
+	...DefaultStory,
+	args: {
+		id: "polyline",
+		modes: [
+			() =>
+				new TerraDrawPolyLineMode({
+					snapping: {
+						toCoordinate: true,
+						toLine: true,
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+// Linestring drawing story
+const LineStringFinishOnNthCoordinate: Story = {
+	...DefaultStory,
+	args: {
+		id: "linestring-finish-on-nth-coordinate",
+		modes: [
+			() =>
+				new TerraDrawLineStringMode({
+					finishOnNthCoordinate: 2,
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+// Linestring drawing story
+const LineStringWithCoordinatePoints: Story = {
+	...DefaultStory,
+	args: {
+		id: "linestring",
+		modes: [
+			() =>
+				new TerraDrawLineStringMode({
+					showCoordinatePoints: true,
+				}),
+		],
 		...DefaultStory.args,
 	},
 };
@@ -337,6 +522,22 @@ const Freehand: Story = {
 	},
 };
 
+// Freehand drawing story
+const FreehandWithSmoothing: Story = {
+	...DefaultStory,
+	args: {
+		id: "freehand-with-smoothing",
+		modes: [
+			() =>
+				new TerraDrawFreehandMode({
+					smoothing: 0.5,
+					preventPointsNearClose: false,
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
 // Freehand autoclose drawing story
 const FreehandWithAutoClose: Story = {
 	...DefaultStory,
@@ -362,19 +563,29 @@ const Sensor: Story = {
 	},
 };
 
-// Sensor drawing story
+// Select mode story
 const Select: Story = {
 	...DefaultStory,
 	args: {
 		id: "select",
 		modes: [
-			() => new TerraDrawPolygonMode(),
+			() =>
+				new TerraDrawPolygonMode({
+					showCoordinatePoints: true,
+					styles: {
+						coordinatePointColor: "#ff0000",
+					},
+				}),
 			() =>
 				new TerraDrawSelectMode({
+					styles: {
+						selectionPointColor: "#0000ff",
+					},
 					flags: {
 						polygon: {
 							feature: {
 								draggable: true,
+								coordinates: {},
 							},
 						},
 					},
@@ -387,7 +598,7 @@ const Select: Story = {
 const SelectWithSelectionPoints: Story = {
 	...DefaultStory,
 	args: {
-		id: "select",
+		id: "select-with-selection-points",
 		modes: [
 			() => new TerraDrawPolygonMode(),
 			() =>
@@ -406,10 +617,98 @@ const SelectWithSelectionPoints: Story = {
 	},
 };
 
+const SelectWithScaleAndRotate: Story = {
+	...DefaultStory,
+	args: {
+		id: "select-with-scale-and-rotate",
+		modes: [
+			() => new TerraDrawPolygonMode(),
+			() =>
+				new TerraDrawSelectMode({
+					flags: {
+						polygon: {
+							feature: {
+								rotateable: true,
+								scaleable: true,
+								coordinates: {},
+							},
+						},
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+const SelectWithResizable: Story = {
+	...DefaultStory,
+	args: {
+		id: "select-with-resizable",
+		modes: [
+			() => new TerraDrawPolygonMode(),
+			() =>
+				new TerraDrawSelectMode({
+					flags: {
+						polygon: {
+							feature: {
+								coordinates: {
+									resizable: "opposite-fixed",
+								},
+							},
+						},
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+const SelectWithHoverCursors: Story = {
+	...DefaultStory,
+	args: {
+		id: "select-with-hover-cursors",
+		modes: [
+			() => new TerraDrawPolygonMode(),
+			() => new TerraDrawLineStringMode(),
+			() =>
+				new TerraDrawSelectMode({
+					cursors: {
+						pointerOver: "move",
+						pointerOverFeature: "grab",
+						pointerOverCoordinate: "pointer",
+						pointerOverResizeHandle: "wait",
+					},
+					flags: {
+						polygon: {
+							feature: {
+								draggable: true,
+								coordinates: {
+									resizable: "center",
+									draggable: false,
+								},
+							},
+						},
+						linestring: {
+							feature: {
+								draggable: true,
+								coordinates: {
+									draggable: true,
+								},
+							},
+						},
+					},
+				}),
+		],
+		instructions:
+			"Draw a polygon and a linestring, then switch to select. Hover polygon fill for feature cursor (grab), linestring vertices for coordinate cursor (pointer), and polygon corner resize handles for resize cursor (wait).",
+		...DefaultStory.args,
+	},
+};
+
 const SelectWithMidPoints: Story = {
 	...DefaultStory,
 	args: {
-		id: "select",
+		id: "select-with-midpoints",
 		modes: [
 			() => new TerraDrawPolygonMode(),
 			() =>
@@ -419,7 +718,83 @@ const SelectWithMidPoints: Story = {
 							feature: {
 								draggable: true,
 								coordinates: {
-									midpoints: true,
+									draggable: true,
+									midpoints: {
+										draggable: true,
+									},
+								},
+							},
+						},
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+const SelectWithMultiSelect: Story = {
+	...DefaultStory,
+	args: {
+		id: "select-with-multiselect",
+		modes: [
+			() => new TerraDrawPolygonMode(),
+			() =>
+				new TerraDrawSelectMode({
+					flags: {
+						polygon: {
+							feature: {
+								draggable: true,
+								coordinates: {},
+							},
+						},
+					},
+				}),
+		],
+		instructions:
+			"Draw a few polygons, then hold Shift and click each feature to multi-select. Shift-click a selected feature to deselect it.",
+		...DefaultStory.args,
+	},
+};
+
+const SelectWithMultipleSelectModes: Story = {
+	...DefaultStory,
+	args: {
+		id: "select-with-multiple-select-modes",
+		modes: [
+			() => new TerraDrawPolygonMode(),
+			() =>
+				new TerraDrawSelectMode({
+					styles: {
+						selectionPointColor: "#0000ff",
+						midPointColor: "#00ffff",
+					},
+					flags: {
+						polygon: {
+							feature: {
+								draggable: true,
+								coordinates: {
+									draggable: true,
+									midpoints: {
+										draggable: true,
+									},
+								},
+							},
+						},
+					},
+				}),
+			() =>
+				new TerraDrawSelectMode({
+					modeName: "alternate-select",
+					styles: {
+						selectionPointColor: "#ff00ff",
+						midPointColor: "#ffff00",
+					},
+					flags: {
+						polygon: {
+							feature: {
+								draggable: true,
+								coordinates: {
+									draggable: true,
 								},
 							},
 						},
@@ -574,8 +949,88 @@ const ProgrammaticRotate: Story = {
 	},
 };
 
+const SelectWithMultipleOfSameModes: Story = {
+	...DefaultStory,
+	args: {
+		id: "select-with-multiple-of-same-modes",
+		modes: [
+			() => new TerraDrawPolygonMode(),
+			() => new TerraDrawPolygonMode({ modeName: "polygon2" }),
+			() =>
+				new TerraDrawSelectMode({
+					flags: {
+						polygon: {
+							feature: {
+								draggable: true,
+							},
+						},
+						polygon2: {
+							feature: {
+								draggable: true,
+								coordinates: {
+									midpoints: true,
+									draggable: true,
+								},
+							},
+						},
+					},
+				}),
+		],
+		...DefaultStory.args,
+	},
+};
+
+const UndoRedo: Story = {
+	...DefaultStory,
+	args: {
+		id: "undo-redo",
+		modes: [
+			() =>
+				new TerraDrawPolygonMode({
+					showCoordinatePoints: true,
+					editable: true,
+					styles: {
+						coordinatePointColor: "#ff0000",
+					},
+				}),
+			() =>
+				new TerraDrawLineStringMode({
+					showCoordinatePoints: true,
+					editable: true,
+					styles: {
+						coordinatePointColor: "#ff0000",
+					},
+				}),
+			() =>
+				new TerraDrawSelectMode({
+					styles: {
+						selectionPointColor: "#0000ff",
+					},
+					flags: {
+						polygon: {
+							feature: {
+								draggable: true,
+								coordinates: {
+									draggable: true,
+									midpoints: {
+										draggable: true,
+									},
+								},
+							},
+						},
+					},
+				}),
+		],
+		enableUndoRedo: true,
+		...DefaultStory.args,
+	},
+};
+
 const AllStories = {
 	Point,
+	MarkerPNG,
+	MarkerJPG,
+	Opacity,
 	Polygon,
 	PolygonWithCoordinatePoints,
 	PolygonWithCoordinateSnapping,
@@ -585,23 +1040,38 @@ const AllStories = {
 	Styling,
 	ZIndexOrdering,
 	Circle,
+	CircleWithClickDragInteraction,
+	CircleWithClickMoveOrDragInteraction,
 	Rectangle,
+	RectangleWithClickDragInteraction,
+	RectangleWithClickMoveOrDragInteraction,
 	AngledRectangle,
 	Sector,
+	PolyLine,
 	LineString,
+	LineStringFinishOnNthCoordinate,
+	LineStringWithCoordinatePoints,
 	LineStringEditable,
 	LineStringWithCoordinateSnapping,
 	LineStringWithLineSnapping,
 	FreehandLineString,
 	Freehand,
 	FreehandWithAutoClose,
+	FreehandWithSmoothing,
 	Sensor,
 	ProgrammaticScale,
 	ProgrammaticRotate,
 	ProgrammaticUpdate,
 	Select,
 	SelectWithSelectionPoints,
+	SelectWithScaleAndRotate,
+	SelectWithResizable,
+	SelectWithHoverCursors,
 	SelectWithMidPoints,
+	SelectWithMultiSelect,
+	SelectWithMultipleOfSameModes,
+	SelectWithMultipleSelectModes,
+	UndoRedo,
 };
 
 export { AllStories };

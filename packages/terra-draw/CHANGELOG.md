@@ -2,6 +2,427 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.31.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.30.1...terra-draw@1.31.0) (2026-05-29)
+
+
+### feat
+
+* **terra-draw:** add polyline mode (#898) ([](https://github.com/JamesLMilner/terra-draw/commit/61a87e4e818622bc35b76a413aae78e3cecf51be)), closes [#898](https://github.com/JamesLMilner/terra-draw/issues/898)
+
+## [1.30.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.30.0...terra-draw@1.30.1) (2026-05-24)
+
+
+### chore
+
+* **terra-draw:** nest unit tests correctly for polygon mode (#897) ([](https://github.com/JamesLMilner/terra-draw/commit/b01c4285e4f0356848afef58bbf5932a2a9106f7)), closes [#897](https://github.com/JamesLMilner/terra-draw/issues/897)
+* **terra-draw:** upgrade to Storybook v10 (#886) ([](https://github.com/JamesLMilner/terra-draw/commit/57397d2f64b753d7959eff0be9775ecf840089b4)), closes [#886](https://github.com/JamesLMilner/terra-draw/issues/886)
+
+
+### fix
+
+* **terra-draw:** capture programmatic geometry and property edits in undo redo stack (#896) ([](https://github.com/JamesLMilner/terra-draw/commit/8e37e02d6bdff34c8fcd1a3e8a1a8f31c63a3420)), closes [#896](https://github.com/JamesLMilner/terra-draw/issues/896)
+
+## [1.30.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.29.0...terra-draw@1.30.0) (2026-05-07)
+
+
+### feat
+
+* **terra-draw:** add initial support for dashed lines (#884) ([](https://github.com/JamesLMilner/terra-draw/commit/074bd05e7108708192155249aa778efc69dbf4c2)), closes [#884](https://github.com/JamesLMilner/terra-draw/issues/884)
+
+
+### chore
+
+* **terra-draw:** bump storybook maplibre to 5.24.0 (#878) ([](https://github.com/JamesLMilner/terra-draw/commit/c4aef67745aa0958eb9cd2b8b91321ffa6568dbb)), closes [#878](https://github.com/JamesLMilner/terra-draw/issues/878)
+* **terra-draw:** remove development package reference from package-lock.json (#877) ([](https://github.com/JamesLMilner/terra-draw/commit/4515f37e3f24a1452e2ed5ba67479d1297e487ac)), closes [#877](https://github.com/JamesLMilner/terra-draw/issues/877)
+
+## [1.29.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.8...terra-draw@1.29.0) (2026-05-03)
+
+
+### feat
+
+* **terra-draw:** add additional cursors for select mode (#872) ([](https://github.com/JamesLMilner/terra-draw/commit/7298bf8b061f1669c2742b341a99d9ca031b2c2f)), closes [#872](https://github.com/JamesLMilner/terra-draw/issues/872)
+
+## [1.28.8](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.7...terra-draw@1.28.8) (2026-04-15)
+
+
+### chore
+
+* **terra-draw:** breakdown deployment script for easier debugging (#868) ([](https://github.com/JamesLMilner/terra-draw/commit/fa92346b61844d78c3a63d8374f4847bdd769954)), closes [#868](https://github.com/JamesLMilner/terra-draw/issues/868)
+
+## [1.28.7](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.6...terra-draw@1.28.7) (2026-04-15)
+
+
+### chore
+
+* **terra-draw:** disable husky checks when gh-pages is being commit (#867) ([](https://github.com/JamesLMilner/terra-draw/commit/63cb482df1d205b320460c066db55f066e9176c3)), closes [#867](https://github.com/JamesLMilner/terra-draw/issues/867)
+
+## [1.28.6](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.5...terra-draw@1.28.6) (2026-04-15)
+
+
+### chore
+
+* **terra-draw:** enable commitAll for release.js to ensure files committed (#866) ([](https://github.com/JamesLMilner/terra-draw/commit/96b8d6f65f47fac5fde23f32a7966f96e1218078)), closes [#866](https://github.com/JamesLMilner/terra-draw/issues/866)
+
+## [1.28.5](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.4...terra-draw@1.28.5) (2026-04-15)
+
+
+### chore
+
+* **terra-draw:** ensure package-lock.json files are updated on release (#864) ([](https://github.com/JamesLMilner/terra-draw/commit/327e0c8d3a05d10fba9905f19461e4360538ab0e)), closes [#864](https://github.com/JamesLMilner/terra-draw/issues/864)
+* **terra-draw:** fix package.json versions for Terra Draw (#865) ([](https://github.com/JamesLMilner/terra-draw/commit/40536011c1a9f4747e67981dfcca0f45f893960e)), closes [#865](https://github.com/JamesLMilner/terra-draw/issues/865)
+
+## [1.28.4](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.3...terra-draw@1.28.4) (2026-04-14)
+
+
+### chore
+
+* **terra-draw:** fix release scripts to avoid extra commits (#862) ([](https://github.com/JamesLMilner/terra-draw/commit/9725ce1169dbc2f1ec66301a01e8c5c3ff9166d2)), closes [#862](https://github.com/JamesLMilner/terra-draw/issues/862)
+
+## [1.28.3](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.2...terra-draw@1.28.3) (2026-04-14)
+
+
+### chore
+
+* **terra-draw:** retry on when package is still publishing (#861) ([](https://github.com/JamesLMilner/terra-draw/commit/7fa1ef15d1b99d90659b455c69b16006d98ecb69)), closes [#861](https://github.com/JamesLMilner/terra-draw/issues/861)
+
+## [1.28.2](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.1...terra-draw@1.28.2) (2026-04-14)
+
+
+### chore
+
+* **terra-draw:** allow automated doc deploys to github pages (#860) ([](https://github.com/JamesLMilner/terra-draw/commit/db9f600206ec709e6588ee53e4667e5aeb287ce0)), closes [#860](https://github.com/JamesLMilner/terra-draw/issues/860)
+
+## [1.28.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.28.0...terra-draw@1.28.1) (2026-04-07)
+
+
+### fix
+
+* **terra-draw:** ensure clear can be undone correctly (#857) ([](https://github.com/JamesLMilner/terra-draw/commit/c1d93cd8b650635920dddbf4c9bbc220a06897d5)), closes [#857](https://github.com/JamesLMilner/terra-draw/issues/857)
+
+## [1.28.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.27.0...terra-draw@1.28.0) (2026-04-07)
+
+
+### feat
+
+* **terra-draw:** add clearUndoRedoHistory method  (#856) ([](https://github.com/JamesLMilner/terra-draw/commit/aac5e77eab4740fa5286998cff6197710053d65d)), closes [#856](https://github.com/JamesLMilner/terra-draw/issues/856)
+
+## [1.27.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.26.0...terra-draw@1.27.0) (2026-03-28)
+
+
+### fix
+
+* **terra-draw:** fallback to default styling when style callbacks in select mode return undefined (#832) ([](https://github.com/JamesLMilner/terra-draw/commit/c93bfdb15fa3bc7af279412f842f31b61427d702)), closes [#832](https://github.com/JamesLMilner/terra-draw/issues/832)
+* **terra-draw:** fixed scenario where validation reason would be undefined (#844) ([](https://github.com/JamesLMilner/terra-draw/commit/6bc4fa91dd386d4310ba6224bc3b0828616be229)), closes [#844](https://github.com/JamesLMilner/terra-draw/issues/844)
+* **terra-draw:** minor bug fixes to session undo redo (#838) ([](https://github.com/JamesLMilner/terra-draw/commit/c8d5bc02e38c4b01648927eafe62a03b2c78a6be)), closes [#838](https://github.com/JamesLMilner/terra-draw/issues/838)
+
+
+### chore
+
+* **terra-draw:** only call set options once for Google Maps in storybook (#845) ([](https://github.com/JamesLMilner/terra-draw/commit/131e914ca4d2f4750796fa7c6cb191c2653447b6)), closes [#845](https://github.com/JamesLMilner/terra-draw/issues/845)
+* **terra-draw:** stabilise Storybook stories (#840) ([](https://github.com/JamesLMilner/terra-draw/commit/890a1cb920f6e4438a7f820af35b027c74b334c3)), closes [#840](https://github.com/JamesLMilner/terra-draw/issues/840)
+* **terra-draw:** use ES module syntax for jest configs (#839) ([](https://github.com/JamesLMilner/terra-draw/commit/1c0400901af48fa1d582970c1c79ec18db30e59b)), closes [#839](https://github.com/JamesLMilner/terra-draw/issues/839)
+
+
+### feat
+
+* **terra-draw:** add allowManualSelection option to TerraDrawSelectMode (#842) ([](https://github.com/JamesLMilner/terra-draw/commit/79d59197411710885361b7b5dbe3dface2c9a59c)), closes [#842](https://github.com/JamesLMilner/terra-draw/issues/842)
+
+
+### docs
+
+* **terra-draw:** improve the undo redo documentation (#837) ([](https://github.com/JamesLMilner/terra-draw/commit/d501283603cc5588e79f16defdb3774d8c98d5f4)), closes [#837](https://github.com/JamesLMilner/terra-draw/issues/837)
+
+## [1.26.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.25.1...terra-draw@1.26.0) (2026-03-15)
+
+
+### fix
+
+* **terra-draw:** remove epsilon addition lat lng for new polygons (#814) ([](https://github.com/JamesLMilner/terra-draw/commit/3982738995033c0e0f66f41e2831a0b5a2451d4f)), closes [#814](https://github.com/JamesLMilner/terra-draw/issues/814)
+
+
+### feat
+
+* **terra-draw:** add undo redo functionality  (#829) ([](https://github.com/JamesLMilner/terra-draw/commit/c939c215af173220ba3dc264b4b0d2dce06c3c85)), closes [#829](https://github.com/JamesLMilner/terra-draw/issues/829)
+
+## [1.25.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.25.0...terra-draw@1.25.1) (2026-03-13)
+
+
+### docs
+
+* **terra-draw:** Fix links in Drawing Modes section (#833) ([](https://github.com/JamesLMilner/terra-draw/commit/ec009c2219a6a5b1ae961433177a86bd6fdaf244)), closes [#833](https://github.com/JamesLMilner/terra-draw/issues/833)
+
+
+### fix
+
+* **terra-draw:** emit correct action for finish event for polygon onDragEnd (#836) ([](https://github.com/JamesLMilner/terra-draw/commit/37d730abec3b2e9d4d52586d7f9c46265d73f24c)), closes [#836](https://github.com/JamesLMilner/terra-draw/issues/836)
+* **terra-draw:** fix bug when changing showCoordinatePoints with updateOptions in polygon mode (#835) ([](https://github.com/JamesLMilner/terra-draw/commit/cfff133b725c6df1cf0f279e1fe454a376d38345)), closes [#835](https://github.com/JamesLMilner/terra-draw/issues/835)
+
+## [1.25.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.24.2...terra-draw@1.25.0) (2026-02-18)
+
+
+### chore
+
+* **terra-draw:** add storybook story for smoothing in freehand mode (#821) ([](https://github.com/JamesLMilner/terra-draw/commit/9ebea41ee2019a3f39569d76e9015608ad5e94ca)), closes [#821](https://github.com/JamesLMilner/terra-draw/issues/821)
+* **terra-draw:** add way to disable coverage threshold when developing locally (#816) ([](https://github.com/JamesLMilner/terra-draw/commit/75fdfde7ba5289fbfc05f2f2f876c088ad155510)), closes [#816](https://github.com/JamesLMilner/terra-draw/issues/816)
+* **terra-draw:** bump jest to version 30 (#817) ([](https://github.com/JamesLMilner/terra-draw/commit/c4d3a64146e867a61e1233041aca19739599be7d)), closes [#817](https://github.com/JamesLMilner/terra-draw/issues/817)
+* **terra-draw:** enable trusted publishing on all packages (#813) ([](https://github.com/JamesLMilner/terra-draw/commit/2081e01e6a45113a1f7296184d6166a17d2df7c7)), closes [#813](https://github.com/JamesLMilner/terra-draw/issues/813)
+* **terra-draw:** skip testing in dist folders (#815) ([](https://github.com/JamesLMilner/terra-draw/commit/9c1726c56fee1b5b060d34190be34810c4accf7d)), closes [#815](https://github.com/JamesLMilner/terra-draw/issues/815)
+
+
+### feat
+
+* **terra-draw:** allow multiple select modes concurrently (#818) ([](https://github.com/JamesLMilner/terra-draw/commit/e1325935120bc7170f9b4e92d50debd01eab33c6)), closes [#818](https://github.com/JamesLMilner/terra-draw/issues/818)
+* **terra-draw:** smoothing option for freehand (#820) ([](https://github.com/JamesLMilner/terra-draw/commit/c66f679aeaefe66caf36f3ef4d1664f561e772d9)), closes [#820](https://github.com/JamesLMilner/terra-draw/issues/820)
+* **terra-draw:** support draw interactions for freehand mode (#819) ([](https://github.com/JamesLMilner/terra-draw/commit/51941298f6ab95d53fac2808aff26f4945b76094)), closes [#819](https://github.com/JamesLMilner/terra-draw/issues/819)
+
+## [1.24.2](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.24.1...terra-draw@1.24.2) (2026-02-11)
+
+
+### chore
+
+* **terra-draw:** use OIDC Trusted Publishing (#812) ([](https://github.com/JamesLMilner/terra-draw/commit/b46f9166602c820dc50d49f3be7dc124035acd00)), closes [#812](https://github.com/JamesLMilner/terra-draw/issues/812)
+
+## [1.24.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.24.0...terra-draw@1.24.1) (2026-02-10)
+
+
+### fix
+
+* **terra-draw:** assure consistent mouse move and click/drag behavior for midpoints (#807) ([](https://github.com/JamesLMilner/terra-draw/commit/aad8bd3da63cab7502f9dd1c7e8c7dc2901e6ef0)), closes [#807](https://github.com/JamesLMilner/terra-draw/issues/807)
+* **terra-draw:** ensure cursor near midpoint and actual insertion behaviours match (#805) ([](https://github.com/JamesLMilner/terra-draw/commit/338c2560e65b5699ecf49917cc16b2b82ec7915b)), closes [#805](https://github.com/JamesLMilner/terra-draw/issues/805)
+* **terra-draw:** ensure midpoint events do not always take priority in select mode (#810) ([](https://github.com/JamesLMilner/terra-draw/commit/808e3d3fa58fd34025e3504cdd0715cd674fb8bf)), closes [#810](https://github.com/JamesLMilner/terra-draw/issues/810)
+
+## [1.24.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.23.3...terra-draw@1.24.0) (2026-02-01)
+
+
+### chore
+
+* **terra-draw:** fix npm audit high rated issues (#801) ([](https://github.com/JamesLMilner/terra-draw/commit/fdb0716373b4c16f243fc3a1c1fb365eb0f4146d)), closes [#801](https://github.com/JamesLMilner/terra-draw/issues/801)
+* **terra-draw:** improve the opacity story example for in the storybook package (#802) ([](https://github.com/JamesLMilner/terra-draw/commit/af97f567958dea020f8308e561c28180f2bd9708)), closes [#802](https://github.com/JamesLMilner/terra-draw/issues/802)
+* **terra-draw:** update github action versions to v6 for checkout and setup-node (#804) ([](https://github.com/JamesLMilner/terra-draw/commit/41a153a91c4dc745a0b3bb8d153af4dd38acd523)), closes [#804](https://github.com/JamesLMilner/terra-draw/issues/804)
+* **terra-draw:** use Node v24 and npm 11 where possible (#803) ([](https://github.com/JamesLMilner/terra-draw/commit/38a7c6fe4bea3b7ad363bf351d29ca92ecb624b1)), closes [#803](https://github.com/JamesLMilner/terra-draw/issues/803)
+
+
+### feat
+
+* **terra-draw:** add support for point and linestring opacity (#785) ([](https://github.com/JamesLMilner/terra-draw/commit/5ecccd60780f84a9a67e0a7c44c4ac124c6abbc7)), closes [#785](https://github.com/JamesLMilner/terra-draw/issues/785)
+* **terra-draw:** add support from polygon outline opacity configuration (#794) ([](https://github.com/JamesLMilner/terra-draw/commit/2b2a711dfabeb2e159cafecd6e0b94f359b5254c)), closes [#794](https://github.com/JamesLMilner/terra-draw/issues/794)
+
+## [1.23.3](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.23.2...terra-draw@1.23.3) (2026-01-31)
+
+
+### fix
+
+* **terra-draw:** ensure resizable updates coordinate and midpoints correctly (#793) ([](https://github.com/JamesLMilner/terra-draw/commit/e7f8cfb2966bc18b45775035d4724f31e3282c6e)), closes [#793](https://github.com/JamesLMilner/terra-draw/issues/793)
+
+## [1.23.2](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.23.1...terra-draw@1.23.2) (2026-01-30)
+
+
+### fix
+
+* **terra-draw:** ensure points do not set marker property to true (#783) ([](https://github.com/JamesLMilner/terra-draw/commit/983539f1803d11da133a0757bcdda7a5f6374385)), closes [#783](https://github.com/JamesLMilner/terra-draw/issues/783)
+
+
+### docs
+
+* **terra-draw:** fix the adapter links in terra-draw package README.md (#779) ([](https://github.com/JamesLMilner/terra-draw/commit/dab83f2cb95c43165bf57c4c9bb49c01c1251dd3)), closes [#779](https://github.com/JamesLMilner/terra-draw/issues/779)
+* **terra-draw:** update the links to the adapter class documentation (#776) ([](https://github.com/JamesLMilner/terra-draw/commit/273f86d7fe6371ea757f34cad4cc7bd80b0544bb)), closes [#776](https://github.com/JamesLMilner/terra-draw/issues/776)
+
+## [1.23.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.23.0...terra-draw@1.23.1) (2026-01-17)
+
+
+### fix
+
+* **terra-draw:** ensure snapping points are updated as expected in polygon mode when right clicking (#774) ([](https://github.com/JamesLMilner/terra-draw/commit/634fea999087ad3efae14494b7f938eb53a3a422)), closes [#774](https://github.com/JamesLMilner/terra-draw/issues/774)
+
+## [1.23.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.22.0...terra-draw@1.23.0) (2026-01-15)
+
+
+### feat
+
+* **terra-draw:** add finishOnNthCoordinate as option to linestring mode (#772) ([](https://github.com/JamesLMilner/terra-draw/commit/e7d87395da4961d02e5a67de98f74f1ac4bf36c0)), closes [#772](https://github.com/JamesLMilner/terra-draw/issues/772)
+* **terra-draw:** add linestring support for coordinate points (#771) ([](https://github.com/JamesLMilner/terra-draw/commit/351ea3ae650c2b8cd485696019c722d91a4af74f)), closes [#771](https://github.com/JamesLMilner/terra-draw/issues/771)
+
+
+### fix
+
+* **terra-draw:** fix coordinate points not updating correctly with polygon editable argument (#770) ([](https://github.com/JamesLMilner/terra-draw/commit/4ffeedd7596f2450b0cbbfd004e7e521ad632509)), closes [#770](https://github.com/JamesLMilner/terra-draw/issues/770)
+
+## [1.22.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.21.4...terra-draw@1.22.0) (2026-01-09)
+
+
+### feat
+
+* **terra-draw:** allow the number of segments in circle mode to be configurable (#768) ([](https://github.com/JamesLMilner/terra-draw/commit/c12b0108b706e796fd27614e2c04a256ca0b608d)), closes [#768](https://github.com/JamesLMilner/terra-draw/issues/768)
+
+## [1.21.4](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.21.3...terra-draw@1.21.4) (2026-01-08)
+
+
+### fix
+
+* **terra-draw:** fix midpoint not being update correctly on coordinate drag (#767) ([](https://github.com/JamesLMilner/terra-draw/commit/20d52af8946277d29f6a3ff0b33d3520d3859a6a)), closes [#767](https://github.com/JamesLMilner/terra-draw/issues/767)
+
+## [1.21.3](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.21.2...terra-draw@1.21.3) (2026-01-07)
+
+
+### fix
+
+* **terra-draw:** ensure that setMode can be called in onFinish (#766) ([](https://github.com/JamesLMilner/terra-draw/commit/6819b1c406883016c8b8123ac04b38e8538d9503)), closes [#766](https://github.com/JamesLMilner/terra-draw/issues/766)
+
+## [1.21.2](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.21.1...terra-draw@1.21.2) (2026-01-01)
+
+
+### fix
+
+* **terra-draw:** fix feature being deleted and then stop being called in on finish (#763) ([](https://github.com/JamesLMilner/terra-draw/commit/c9b5e4b70362839c4316e7c576e98253a85fcd7f)), closes [#763](https://github.com/JamesLMilner/terra-draw/issues/763)
+
+## [1.21.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.21.0...terra-draw@1.21.1) (2025-12-31)
+
+
+### fix
+
+* **terra-draw:** call cleanup when a currently drawn feature is deleted (#760) ([](https://github.com/JamesLMilner/terra-draw/commit/771d0567125a27d471e9bfa397f5d2ddf263e5d4)), closes [#760](https://github.com/JamesLMilner/terra-draw/issues/760)
+* **terra-draw:** use Array.from for Sets instead of spreading due to microbundle (#757) ([](https://github.com/JamesLMilner/terra-draw/commit/dd4b1091dd43302f6b7409b25cf5e96296549ea9)), closes [#757](https://github.com/JamesLMilner/terra-draw/issues/757)
+
+## [1.21.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.20.0...terra-draw@1.21.0) (2025-12-26)
+
+
+### test
+
+* **terra-draw:** add more unit tests around custom mode names (#753) ([](https://github.com/JamesLMilner/terra-draw/commit/05fe176e4dc420db64578b9471f3d00908559fde)), closes [#753](https://github.com/JamesLMilner/terra-draw/issues/753)
+* **terra-draw:** add some additional unit tests for coordinate points (#755) ([](https://github.com/JamesLMilner/terra-draw/commit/b49fbbb9ca860a431ad4af37aae47a94b830679e)), closes [#755](https://github.com/JamesLMilner/terra-draw/issues/755)
+
+
+### fix
+
+* **terra-draw:** ensure that rectangle mode cleanup can handle deleted geometries (#754) ([](https://github.com/JamesLMilner/terra-draw/commit/dbcd5e53882f85e182927fd3a610f0b9906f24d7)), closes [#754](https://github.com/JamesLMilner/terra-draw/issues/754)
+* **terra-draw:** ensure that toLine and toCoordinate snapping works correctly in linestring mode (#740) ([](https://github.com/JamesLMilner/terra-draw/commit/c6ed5c2cb943dae70bc5b6cde4a59e73ec788c54)), closes [#740](https://github.com/JamesLMilner/terra-draw/issues/740)
+
+
+### chore
+
+* **terra-draw:** fix mutate behavior tests (#751) ([](https://github.com/JamesLMilner/terra-draw/commit/e42c4c318a7d2a563dfcc7239f03a87e9a03722e)), closes [#751](https://github.com/JamesLMilner/terra-draw/issues/751)
+
+
+### refactor
+
+* **terra-draw:** add a centralised way to manipulate geometries (#718) ([](https://github.com/JamesLMilner/terra-draw/commit/971d307727911d14dc111934f9eb5b6096117398)), closes [#718](https://github.com/JamesLMilner/terra-draw/issues/718)
+* **terra-draw:** rework behaviors to use mutate feature behavior (#750) ([](https://github.com/JamesLMilner/terra-draw/commit/dd1c5a2ada0aa5b0aba68d773567330015e81459)), closes [#750](https://github.com/JamesLMilner/terra-draw/issues/750)
+* **terra-draw:** use MutateBehavior in select mode (#747) ([](https://github.com/JamesLMilner/terra-draw/commit/73c1ad9298bcb06b6e0aeaccf4d2c053cb6b6cb0)), closes [#747](https://github.com/JamesLMilner/terra-draw/issues/747)
+* **terra-draw:** use MutateFeatureBehavior for circle and rectangle modes (#738) ([](https://github.com/JamesLMilner/terra-draw/commit/9fc1bfd5c73e7b61a7fd26d888173828c1a12594)), closes [#738](https://github.com/JamesLMilner/terra-draw/issues/738)
+* **terra-draw:** use MutateFeatureBehavior in angled rectangle mode (#741) ([](https://github.com/JamesLMilner/terra-draw/commit/7d8598fce6947da44334b1a0451fe9a2082bb441)), closes [#741](https://github.com/JamesLMilner/terra-draw/issues/741)
+* **terra-draw:** use MutateFeatureBehavior in freehand and freehand-linestring modes (#744) ([](https://github.com/JamesLMilner/terra-draw/commit/fe2ce9ea748266ed509094d5aa8fc1a456d6e29f)), closes [#744](https://github.com/JamesLMilner/terra-draw/issues/744)
+* **terra-draw:** use MutateFeatureBehavior in point and marker modes (#743) ([](https://github.com/JamesLMilner/terra-draw/commit/aa8d5d4d7ca757813b64c88eaef9847681549b89)), closes [#743](https://github.com/JamesLMilner/terra-draw/issues/743)
+* **terra-draw:** use MutateFeatureBehavior in sector and sensor modes (#746) ([](https://github.com/JamesLMilner/terra-draw/commit/dc1fb8c6e2b7260515450da0d8f38a9b2930b778)), closes [#746](https://github.com/JamesLMilner/terra-draw/issues/746) [#744](https://github.com/JamesLMilner/terra-draw/issues/744)
+
+
+### feat
+
+* **terra-draw:** optional click-and-drag support for TerraDrawCircleMode (#668) (#745) ([](https://github.com/JamesLMilner/terra-draw/commit/e7144e97e919b268a1dc7b0f878276a8a36e5236)), closes [#668](https://github.com/JamesLMilner/terra-draw/issues/668) [#745](https://github.com/JamesLMilner/terra-draw/issues/745) [#744](https://github.com/JamesLMilner/terra-draw/issues/744) [#668](https://github.com/JamesLMilner/terra-draw/issues/668)
+* **terra-draw:** provide event type to getMapEventElement (#733) ([](https://github.com/JamesLMilner/terra-draw/commit/25cc42c67adee74d7a4f487bada4b03a49f457ad)), closes [#733](https://github.com/JamesLMilner/terra-draw/issues/733)
+
+## [1.20.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.19.0...terra-draw@1.20.0) (2025-11-29)
+
+
+### chore
+
+* **terra-draw:** add sponsorship page (#722) ([](https://github.com/JamesLMilner/terra-draw/commit/5534a93436af45bbf11cf7a9a61423e2d62e0968)), closes [#722](https://github.com/JamesLMilner/terra-draw/issues/722)
+* **terra-draw:** use vite instead of webpack (#717) ([](https://github.com/JamesLMilner/terra-draw/commit/81cd10bd22ba164e900a7d46e73b911da0b1ca20)), closes [#717](https://github.com/JamesLMilner/terra-draw/issues/717)
+
+
+### docs
+
+* **terra-draw:** add Rectangle draw interaction examples to Storybook (#668) (#721) ([](https://github.com/JamesLMilner/terra-draw/commit/39c5feb8f4d8da8eb6aaa83b1da68dc72d3c8e94)), closes [#668](https://github.com/JamesLMilner/terra-draw/issues/668) [#721](https://github.com/JamesLMilner/terra-draw/issues/721)
+* **terra-draw:** document marker property requirement for marker icons (#712) ([](https://github.com/JamesLMilner/terra-draw/commit/576d15597155aad3e2e88588f5d76d4ad38429c1)), closes [#712](https://github.com/JamesLMilner/terra-draw/issues/712)
+
+
+### feat
+
+* **terra-draw:** add context to determine if update is to properties or geometry (#708) ([](https://github.com/JamesLMilner/terra-draw/commit/5f3a2e1039b3cffaf78fa80e5ddaa3dd6741644e)), closes [#708](https://github.com/JamesLMilner/terra-draw/issues/708)
+* **terra-draw:** optional click-and-drag support for TerraDrawRectangleMode (#668) (#700) ([](https://github.com/JamesLMilner/terra-draw/commit/58b9fad191debc6b499b2a3da503c3a091af5f13)), closes [#668](https://github.com/JamesLMilner/terra-draw/issues/668) [#700](https://github.com/JamesLMilner/terra-draw/issues/700) [#668](https://github.com/JamesLMilner/terra-draw/issues/668)
+
+
+### fix
+
+* **terra-draw:** avoid excessive change events and duplicate ids from property changes (#707) ([](https://github.com/JamesLMilner/terra-draw/commit/e5323b02366105b7660e37d00fa780405215b2d1)), closes [#707](https://github.com/JamesLMilner/terra-draw/issues/707)
+* **terra-draw:** trigger finish event when inserting or deleting coordinate in select mode (#709) ([](https://github.com/JamesLMilner/terra-draw/commit/b69c2c93e1c3585a63539bd63fcc742911fcccb7)), closes [#709](https://github.com/JamesLMilner/terra-draw/issues/709)
+
+## [1.19.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.18.1...terra-draw@1.19.0) (2025-11-09)
+
+
+### docs
+
+* **terra-draw:** added required args to OpenLayers Adapter docs (#690) ([](https://github.com/JamesLMilner/terra-draw/commit/35caea04274fc1fcb35051ac52b7e644244a5f5b)), closes [#690](https://github.com/JamesLMilner/terra-draw/issues/690)
+* **terra-draw:** fix console log syntax error in 4.MODES.md  ([](https://github.com/JamesLMilner/terra-draw/commit/a3d87c489f2404d5b2589644b7185e5c07bbdd62))
+* **terra-draw:** update the API docs (#704) ([](https://github.com/JamesLMilner/terra-draw/commit/eebed8227352deefa766333d8f757d3707f09c6e)), closes [#704](https://github.com/JamesLMilner/terra-draw/issues/704)
+
+
+### chore
+
+* **terra-draw:** use a centralised type for updateOptions argument (#705) ([](https://github.com/JamesLMilner/terra-draw/commit/51d004b845db6edf9068b5c8da9c442290c2f191)), closes [#705](https://github.com/JamesLMilner/terra-draw/issues/705)
+
+
+### feat
+
+* **terra-draw:** allow multiple instances of a mode via modeName constructor property (#701) ([](https://github.com/JamesLMilner/terra-draw/commit/855413c450b08ec66ed77e66d2a4eab44793f33d)), closes [#701](https://github.com/JamesLMilner/terra-draw/issues/701)
+
+## [1.18.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.18.0...terra-draw@1.18.1) (2025-10-20)
+
+
+### fix
+
+* **terra-draw:** add default marker url for marker mode (#696) ([](https://github.com/JamesLMilner/terra-draw/commit/b8ae458cb281b20a159b7b9dec7ba09fe34fd4d5)), closes [#696](https://github.com/JamesLMilner/terra-draw/issues/696)
+* **terra-draw:** ensure default marker url path is correct (#697) ([](https://github.com/JamesLMilner/terra-draw/commit/dc407860fdb3bf08308a39a675f981ed3170d0f1)), closes [#697](https://github.com/JamesLMilner/terra-draw/issues/697)
+* **terra-draw:** ensure markers are styleable in select mode (#695) ([](https://github.com/JamesLMilner/terra-draw/commit/bd6b7f56a1deeaf9affc24d937a8a885fb621a37)), closes [#695](https://github.com/JamesLMilner/terra-draw/issues/695)
+
+
+### docs
+
+* **terra-draw:** document supported image formats for markers (#686) ([](https://github.com/JamesLMilner/terra-draw/commit/19c8552950d42b54c6fb94190878bdc48bfc06c3)), closes [#686](https://github.com/JamesLMilner/terra-draw/issues/686)
+
+## [1.18.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.17.0...terra-draw@1.18.0) (2025-10-14)
+
+
+### feat
+
+* **terra-draw:** provide ignoreMismatchedPointerEvents option in adapters (#685) ([](https://github.com/JamesLMilner/terra-draw/commit/ace08dc48e54796691bead4a4a3ad51db2dabaee)), closes [#685](https://github.com/JamesLMilner/terra-draw/issues/685)
+
+## [1.17.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.16.0...terra-draw@1.17.0) (2025-10-12)
+
+
+### docs
+
+* **terra-draw:** add story to Storybook for new marker mode (#677) ([](https://github.com/JamesLMilner/terra-draw/commit/b892eb68f69bda79723e12cdf92fc6caa3cbd0ea)), closes [#677](https://github.com/JamesLMilner/terra-draw/issues/677)
+* **terra-draw:** update guide docs to reflect new features (#669) ([](https://github.com/JamesLMilner/terra-draw/commit/f37d4db57a124521924a9e71ac79e7b2a217d0f8)), closes [#669](https://github.com/JamesLMilner/terra-draw/issues/669)
+* **terra-draw:** update outdated link in 4.MODES.md (#666) ([](https://github.com/JamesLMilner/terra-draw/commit/4cadc66ce4e566e0d98d8e856e256c08f974c477)), closes [#666](https://github.com/JamesLMilner/terra-draw/issues/666)
+
+
+### feat
+
+* **terra-draw:** add initial support for markers and a built in marker mode (#670) ([](https://github.com/JamesLMilner/terra-draw/commit/dff272dfbea16467ad23daa28456adc23e40736c)), closes [#670](https://github.com/JamesLMilner/terra-draw/issues/670)
+
+## [1.16.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.15.0...terra-draw@1.16.0) (2025-10-06)
+
+
+### fix
+
+* **terra-draw:** ensure addClosestCoordinateInfoToProperties does not break polygon coordinates (#664) ([](https://github.com/JamesLMilner/terra-draw/commit/f71f00791b8c2facf364d9ba978ea15ac6440521)), closes [#664](https://github.com/JamesLMilner/terra-draw/issues/664)
+* **terra-draw:** ensure precision is respected for TerraDrawAngledRectangleMode (#661) ([](https://github.com/JamesLMilner/terra-draw/commit/0d969b1341db927f3a0890134cb08139e384f668)), closes [#661](https://github.com/JamesLMilner/terra-draw/issues/661)
+
+
+### chore
+
+* **terra-draw:** add benchmarking for the public Terra Draw API (#663) ([](https://github.com/JamesLMilner/terra-draw/commit/d19f03486136ac6b1e55490c949c0a22a77600a4)), closes [#663](https://github.com/JamesLMilner/terra-draw/issues/663)
+
+
+### test
+
+* **terra-draw:** add unit tests for ignoreSnappingPoints (#660) ([](https://github.com/JamesLMilner/terra-draw/commit/965fc625007e0451c07cda3b00a64d740f4a5cb0)), closes [#660](https://github.com/JamesLMilner/terra-draw/issues/660)
+
+
+### feat
+
+* **terra-draw:** provide a option for getFeaturesAt methods to ignore snapping points ([](https://github.com/JamesLMilner/terra-draw/commit/6dce5e70c0a4c064b4ebd8b70824fdea69db69fe))
+
 ## [1.15.0](https://github.com/JamesLMilner/terra-draw/compare/terra-draw@1.14.0...terra-draw@1.15.0) (2025-09-17)
 
 

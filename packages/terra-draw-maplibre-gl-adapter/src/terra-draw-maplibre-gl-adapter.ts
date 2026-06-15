@@ -18,9 +18,9 @@ import {
 } from "maplibre-gl";
 import { Feature, LineString, Point, Polygon } from "geojson";
 
-export class TerraDrawMapLibreGLAdapter<MapType>
-	extends TerraDrawExtend.TerraDrawBaseAdapter
-{
+export class TerraDrawMapLibreGLAdapter<
+	MapType,
+> extends TerraDrawExtend.TerraDrawBaseAdapter {
 	constructor(
 		config: {
 			map: MapType;
@@ -29,6 +29,7 @@ export class TerraDrawMapLibreGLAdapter<MapType>
 			renderLinesBelowLayerId?: string;
 			renderPolygonsBelowLayerId?: string;
 			prefixId?: string;
+			onCursorChange?: (cursor: Parameters<SetCursor>[0]) => void;
 		} & TerraDrawExtend.BaseAdapterConfig,
 	) {
 		super(config);
@@ -44,6 +45,7 @@ export class TerraDrawMapLibreGLAdapter<MapType>
 			config.renderPolygonsBelowLayerId ?? config.renderBelowLayerId;
 
 		this._prefixId = config.prefixId || "td";
+		this._onCursorChange = config.onCursorChange;
 	}
 
 	// Per-layer render ordering (fork extension — allows finer-grained control than
@@ -94,6 +96,9 @@ export class TerraDrawMapLibreGLAdapter<MapType>
 	private _nextRender: number | undefined;
 	private _map: MaplibreMap;
 	private _container: HTMLElement;
+	private _onCursorChange:
+		| ((cursor: Parameters<SetCursor>[0]) => void)
+		| undefined;
 
 	private toGlDashArrayFromPixels(
 		dash: [number, number] | undefined,
@@ -430,6 +435,14 @@ export class TerraDrawMapLibreGLAdapter<MapType>
 	 * @param cursor The CSS cursor style to apply, or 'unset' to restore the initial cursor style.
 	 */
 	public setCursor(cursor: Parameters<SetCursor>[0]) {
+		// When a host application opts in via `onCursorChange`, it takes ownership of
+		// cursor rendering (e.g. so a single source of truth drives the map cursor).
+		// Terra Draw then only emits its intent and never mutates the canvas directly.
+		if (this._onCursorChange) {
+			this._onCursorChange(cursor);
+			return;
+		}
+
 		const canvas = this._map.getCanvas();
 
 		if (this._initialCursor === undefined && cursor !== "unset") {

@@ -120,3 +120,25 @@ the styling interface.
 `packages/terra-draw/src/terra-draw.extensions.spec.ts`
 
 **Upstream state:** Not in the union.
+
+---
+
+## 8 — `onCursorChange` callback (MapLibre adapter)
+
+**What:** The MapLibre adapter accepts an optional `onCursorChange` callback. When
+provided, `setCursor` forwards every cursor intent (including `"unset"`) to the
+callback and does **not** mutate `map.getCanvas().style.cursor`. When omitted, the
+adapter falls back to its existing DOM-mutating behaviour (feature #2).
+
+**Option:**
+- `onCursorChange?: (cursor: Parameters<SetCursor>[0]) => void`
+
+**Why:** Terra Draw manages cursor state for its own purposes (e.g. changing the
+cursor over a coordinate) by writing directly to the canvas, which clobbers any
+cursor management the host application performs outside Terra Draw. The callback
+lets the host treat Terra Draw's cursor changes as *intents* and resolve the final
+cursor through a single source of truth (e.g. a React `cursor` prop / priority
+stack) while preserving Terra Draw's cursor affordances.
+
+**Files:** `packages/terra-draw-maplibre-gl-adapter/src/terra-draw-maplibre-gl-adapter.ts`
+**Upstream state:** No callback — `setCursor` always mutates the canvas directly.

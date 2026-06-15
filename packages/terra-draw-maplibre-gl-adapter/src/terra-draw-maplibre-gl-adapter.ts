@@ -91,7 +91,6 @@ export class TerraDrawMapLibreGLAdapter<
 	private _prefixId: string;
 	private _initialDragPan: boolean | undefined;
 	private _initialDragRotate: boolean | undefined;
-	private _initialCursor: string | undefined;
 	private _isManagingDrag: boolean = false;
 	private _nextRender: number | undefined;
 	private _map: MaplibreMap;
@@ -432,7 +431,7 @@ export class TerraDrawMapLibreGLAdapter<
 
 	/**
 	 * Sets the cursor style for the map container.
-	 * @param cursor The CSS cursor style to apply, or 'unset' to restore the initial cursor style.
+	 * @param cursor The CSS cursor style to apply, or 'unset' to clear the inline cursor style.
 	 */
 	public setCursor(cursor: Parameters<SetCursor>[0]) {
 		// When a host application opts in via `onCursorChange`, it takes ownership of
@@ -445,16 +444,8 @@ export class TerraDrawMapLibreGLAdapter<
 
 		const canvas = this._map.getCanvas();
 
-		if (this._initialCursor === undefined && cursor !== "unset") {
-			this._initialCursor = canvas.style.cursor;
-		}
-
 		if (cursor === "unset") {
-			if (this._initialCursor) {
-				canvas.style.cursor = this._initialCursor;
-			} else {
-				canvas.style.removeProperty("cursor");
-			}
+			canvas.style.removeProperty("cursor");
 		} else {
 			canvas.style.cursor = cursor;
 		}

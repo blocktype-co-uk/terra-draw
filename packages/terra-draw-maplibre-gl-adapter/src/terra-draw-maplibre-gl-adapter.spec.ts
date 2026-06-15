@@ -312,7 +312,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 		});
 
 		describe("when a cursor is set and then unset", () => {
-			it("restores the initial cursor", () => {
+			it("clears the inline cursor style", () => {
 				const map = createMapLibreGLMap();
 				const adapter = new TerraDrawMapLibreGLAdapter({
 					map: map as maplibregl.Map,
@@ -330,7 +330,7 @@ describe("TerraDrawMapLibreGLAdapter", () => {
 				expect(container.style.cursor).toBe("pointer");
 
 				adapter.setCursor("unset");
-				expect(container.style.cursor).toBe("initial");
+				expect(container.style.removeProperty).toHaveBeenCalledWith("cursor");
 			});
 		});
 

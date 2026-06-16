@@ -18,25 +18,7 @@ full commit history.
 
 ---
 
-## 2 — Cursor initial-state preservation (MapLibre adapter)
-
-**What:** `setCursor("unset")` restores the CSS cursor that was on the map canvas
-*before* terra-draw first set it, rather than blindly calling `removeProperty("cursor")`.
-
-**How:** A private `_initialCursor: string | undefined` field is populated on the
-first `setCursor` call. On `"unset"`, the field is restored (or `removeProperty` is
-called if it was never set).
-
-**Why:** Without this, switching out of draw mode leaves the canvas cursor as the
-browser default instead of whatever the host application had set (e.g. a custom
-drag cursor on the map).
-
-**Files:** `packages/terra-draw-maplibre-gl-adapter/src/terra-draw-maplibre-gl-adapter.ts`
-**Upstream state:** Upstream calls `removeProperty` only — does not preserve initial cursor.
-
----
-
-## 3 — Lazy-snapshot draggability (MapLibre adapter)
+## 2 — Lazy-snapshot draggability (MapLibre adapter)
 
 **What:** `setDraggability(false)` captures the current state of `dragPan` and
 `dragRotate` **at the moment it is first called**, not at adapter construction time.
@@ -55,7 +37,7 @@ re-enable dragging.
 
 ---
 
-## 4 — Per-layer render ordering (MapLibre adapter)
+## 3 — Per-layer render ordering (MapLibre adapter)
 
 **What:** The MapLibre adapter accepts three independent `renderBelowLayerId`
 options — one per geometry type — instead of upstream's single field that moves
@@ -77,7 +59,7 @@ for example.
 
 ---
 
-## 5 — `pointerDistance / 2` click threshold (select mode)
+## 4 — `pointerDistance / 2` click threshold (select mode)
 
 **What:** Vertex drag-start fires only when the pointer is within
 `pointerDistance / 2` pixels of a vertex, not the full `pointerDistance`.
@@ -94,7 +76,7 @@ visible handle size rather than extending invisibly beyond it.
 
 ---
 
-## 6 — Configurable `zIndex` styling (polygon, linestring, select modes)
+## 5 — Configurable `zIndex` styling (polygon, linestring, select modes)
 
 **What:** Each mode's styling interface exposes a `zIndex: NumericStyling` property
 so callers can control draw-layer stacking order.
@@ -112,11 +94,33 @@ the styling interface.
 
 ---
 
-## 7 — `"default"` in `SetCursor` union
+## 6 — `onCursorChange` callback (MapLibre adapter)
 
-**What:** `"default"` is a valid value for `SetCursor` / `Cursor`.
+**What:** The MapLibre adapter accepts an optional `onCursorChange` callback. When
+provided, `setCursor` forwards every cursor intent (including `"unset"`) to the
+callback and does **not** mutate `map.getCanvas().style.cursor`. When omitted, the
+adapter falls back to upstream's DOM-mutating behaviour (`canvas.style.cursor = …`
+and `removeProperty("cursor")` on `"unset"`).
 
-**Files:** `packages/terra-draw/src/common.ts`,
-`packages/terra-draw/src/terra-draw.extensions.spec.ts`
+**Option:**
+- `onCursorChange?: (cursor: Parameters<SetCursor>[0]) => void`
 
-**Upstream state:** Not in the union.
+**Why:** Terra Draw manages cursor state for its own purposes (e.g. changing the
+cursor over a coordinate) by writing directly to the canvas, which clobbers any
+cursor management the host application performs outside Terra Draw. The callback
+lets the host treat Terra Draw's cursor changes as *intents* and resolve the final
+cursor through a single source of truth (e.g. a React `cursor` prop / priority
+stack) while preserving Terra Draw's cursor affordances.
+
+**Files:** `packages/terra-draw-maplibre-gl-adapter/src/terra-draw-maplibre-gl-adapter.ts`
+**Upstream state:** No callback — `setCursor` always mutates the canvas directly.
+
+**Removed fork feature:** A prior fork-only `_initialCursor` preservation on
+`"unset"` was dropped in v1.5.0 — it was a partial fix that did not work reliably
+when the host managed cursor state outside Terra Draw. Use `onCursorChange` instead.
+
+**Removed fork feature:** `"default"` in the `SetCursor` union was dropped — it
+existed only so consumers could configure mode cursors (e.g.
+`pointerOverCoordinate: 'default'`) as a workaround for cursor clobbering. With
+`onCursorChange`, Terra Draw emits `"unset"` and the host resolves its own
+fallback cursor.

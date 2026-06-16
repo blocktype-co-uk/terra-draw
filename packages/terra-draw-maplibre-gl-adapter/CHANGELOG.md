@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [1.5.0](https://github.com/blocktype-co-uk/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.4.1...terra-draw-maplibre-gl-adapter@1.5.0) (2026-06-15)
+
+
+### feat
+
+* **terra-draw-maplibre-gl-adapter:** add onCursorChange callback to delegate cursor control ([d6b32f7](https://github.com/blocktype-co-uk/terra-draw/commit/d6b32f7e24cdae3192c64258e9afb31a15e77370))
+
+
+### refactor
+
+* **terra-draw-maplibre-gl-adapter:** remove initial cursor preservation on unset (superseded by onCursorChange)
+* **terra-draw:** remove `"default"` from `SetCursor` union (superseded by onCursorChange)
+
 ## [1.4.1](https://github.com/JamesLMilner/terra-draw/compare/terra-draw-maplibre-gl-adapter@1.4.0...terra-draw-maplibre-gl-adapter@1.4.1) (2026-05-17)
 
 

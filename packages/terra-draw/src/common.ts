@@ -74,7 +74,6 @@ export type SetCursor = (
 		| "crosshair"
 		| "pointer"
 		| "wait"
-		| "default"
 		| "move",
 ) => void;
 
